@@ -1,0 +1,354 @@
+\section{Building an Image Generator}
+\label{sec:image_generation}
+
+In the previous sections, we learned how to train a flow matching or diffusion model to sample from a distribution $\pdata(x)$. This recipe is general and can be applied to a variety of different data types and applications. In this section, we learn how to apply this framework to build an image or video generator, such as e.g., \themeit{Stable Diffusion 3} and \themeit{Meta Movie Gen Video}. To build such a model, there are two main ingredients that we are missing: First, we will need to formulate \themebf{conditional generation} (\themebf{guidance}), e.g. how do we generate an image that fits a specific text prompt, and how our existing objectives may be suitably adapted to this end. We will also learn about classifier-free guidance, a popular technique used to enhance the quality of conditional generation. Second, we will discuss common neural network architectures, again focusing on those designed for images and videos. Finally, we will examine in depth the two state-of-the-art image and video models mentioned above - \themeit{Stable Diffusion} and \themeit{Meta MovieGen} - to give you a taste of how things are done at scale.
+
+\subsection{Guidance}
+
+So far, the generative models we considered were \themebf{unconditional}, e.g. an image model would simply generate \themeit{some} image. However, the task is not merely to generate an arbitrary object, but to generate an object \textbf{\sffamily conditioned on some additional information}. For example, one might imagine a generative model for images which takes in a text prompt $y$, and then generates an image $x$ \textbf{\sffamily conditioned} on $y$. For fixed prompt $y$, we would thus like to sample from $\pdata(x|y)$, that is, the data distribution \textbf{\sffamily conditioned on $y$}. Formally, we think of $y$ to live in a space $\mathcal{Y}$. When $y$ corresponds to a text-prompt, for example, $\mathcal{Y}$ would likely be some continuous space like $\mathbb{R}^{d_y}$. When $y$ corresponds to some discrete class label, $\mathcal{Y}$ would be discrete. In the lab, we will work with the MNIST dataset, in which case we will take $\mathcal{Y} = \{0,1,\dots,9\}$ to correspond to the identities of handwritten digits.\\
+
+To avoid a notation and terminology clash with the use of the word "\text{conditional}" to refer to conditioning on $z \sim \pdata$ (conditional probability path/vector field), we will make use of the term \themebf{guided} to refer specifically to conditioning on $y$.
+\begin{remarkbox}[Guided vs. Conditional Terminology]
+    In these notes, we opt to use the term \themebf{guided} in place of \themebf{conditional} to refer to the act of conditioning on $y$. Here, we will refer to e.g., a \themebf{guided} vector field $\uref_t(x|y)$ and a \themebf{conditional} vector field $\uref_t(x|z)$. This terminology is consistent with other works such as \cite{lipman2024flow}. 
+\end{remarkbox}
+
+The goal of \themebf{guided generative modeling} is thus to be able to sample from $\pdata(x|y)$ \themeit{for any such $y$}. In the language of flow and score matching, and in which our generative models correspond to the simulation of ordinary and stochastic differential equations, this can be phrased as follows.
+
+\begin{ideabox}[Guided Generative Model]
+We define a \themebf{guided diffusion model} to consist of a \themebf{guided vector field} $u_t^{\theta}(\cdot | y)$, parameterized by some neural network, and a time-dependent diffusion coefficient $\sigma_t$, together given by
+\begin{align*}
+    \textbf{\sffamily Neural network:}&\, u^\theta: \mathbb{R}^d \times \mathcal{Y} \times [0,1] \to \mathbb{R}^d,\,\, (x,y,t) \mapsto u_t^{\theta}(x|y)\\
+    \textbf{\sffamily Fixed:}&\, \sigma_t: [0,1] \to [0,\infty),\,\, t \mapsto \sigma_t
+\end{align*}
+Notice the difference from summary \ref{summary:diffusion_model}: we are additionally guiding $u_t^\theta$ with the input $y\in \mathcal{Y}$. For any such $y \in \mathbb{R}^{d_y}$, samples may then be generated from such a model as follows:
+\begin{align*}
+    \textbf{\sffamily Initialization:}\quad X_0&\sim\pinit \quad  &&\blacktriangleright\,\,\text{Initialize with simple distribution (such as a Gaussian)}\\
+    \textbf{\sffamily Simulation:}\quad \dd X_t &= u_t^\theta(X_t|y)\dd t + \sigma_t\dd W_t\quad &&\blacktriangleright\,\,\text{Simulate SDE from $t=0$ to $t=1$.}\\
+    \textbf{\sffamily Goal:}\quad X_1 &\sim  \pdata(\cdot | y) \quad &&\blacktriangleright\,\,\text{Goal is for $X_1$ to be distributed like $\pdata(\cdot|y)$.}
+\end{align*}
+When $\sigma_t = 0$, we say that such a model is a \themebf{guided flow model}.
+\end{ideabox}
+
+\subsubsection{Guidance for Flow Models}
+If we imagine fixing our choice of $y$, and take our data distribution as $p_{\text{data}}(x|y)$, then we have recovered the unguided generative problem, and can accordingly construct a generative model using the conditional flow matching objective, viz.,
+\begin{equation}
+    \mathbb{E}_{z \sim p_{\text{data}}(\cdot|y), x \sim p_t(\cdot|z)} \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2.
+\end{equation}
+Note that the label $y$ does not affect the conditional probability path $p_t(\cdot|z)$ or the conditional vector field $\uref_t(x|z)$ (although in principle, we could make it dependent). % Since the label doesn't actually affect the guided conditional probability path, the above can be further simplified with $\uref_t(x|z,y) = \uref_t(x|z)$ (we might say: ``the guided conditional probability path is the same as the conditional probability path''), which we have worked with already. 
+Expanding the expectation over all such choices of $y$, and over all times $t \in \text{Unif}[0,1)$, we thus obtain a \themebf{guided conditional flow matching objective}
+\begin{equation}
+    \label{eq:guided_cfm}
+    \mathcal{L}_{\text{CFM}}^{\text{guided}}(\theta) = \mathbb{E}_{(z,y) \sim p_{\text{data}}(z,y),\,t\sim \text{Unif}[0,1),\,x\sim p_t(\cdot|z)} \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2.
+\end{equation}
+One of the main differences between the guided objective in \cref{eq:guided_cfm} and the unguided objective from \cref{eq:cfm} is that here we are sampling $(z,y) \sim \pdata$ rather than just $z \sim \pdata$. The reason is that our data distribution is now, in principle, a joint distribution over e.g., both images $z$ and text prompts $y$. In practice, this means that a PyTorch implementation of \cref{eq:guided_cfm} would involve a dataloader which returned batches of \textbf{both $z$ and $y$}. The above procedure leads to a faithful generation procedure of $\pdata(\cdot|y)$.
+
+
+\paragraph{Classifier-Free Guidance.} While the above conditional training procedure is theoretically valid, it was soon empirically realized that images samples with this procedure did not fit well enough to the desired label $y$. It was discovered that perceptual quality is increased when the effect of the guidance variable $y$ is artificially reinforced. This insight was distilled into a technique known as \themebf{classifier-free guidance} that is widely used in the context of state-of-the-art diffusion models, and which we discuss next. For simplicity, we will focus here on the case of Gaussian probability paths. Recall from \cref{eq:gaussian_conditional_probability_paths}
+ that a \textbf{Gaussian conditional probability path} is given by
+\begin{align*}
+    p_t(\cdot|\dap) &= \mathcal{N}(\alpha_t \dap,\beta_t^2 I_d)
+\end{align*}
+where the \text{noise schedulers} $\alpha_t$ and $\beta_t$ are continuously differentiable, monotonic, and satisfy $\alpha_0 = \beta_1 = 0$ and $\alpha_1 = \beta_0 = 1$. 
+%\ph{I uncommented a paragraph here because it was unnecessary} 
+%In the guided setting, our the picture remains essentially the same: the probability path is essentially only a property of $z$ and not $y$. Explicitly, we may define the guided Gaussian conditional probability path as 
+%\begin{align*}
+%     p_0(\cdot|\dap,y) &= \mathcal{N}(\alpha_0 \dap,\beta_0^2 I_d) = \mathcal{N}(0,I_d),\quad \text{and}\quad
+% p_1(\cdot|\dap,y) = \mathcal{N}(\alpha_1 \dap,\beta_1^2 I_d) = \delta_{\dap},
+% \end{align*}
+% where $\alpha_t$ and $\beta_t$ remain the same. The conclusion is that we may marginalize out across $z$ in essentially the same way as in the unguided case so that any earlier result relating $\uref_t(x|z)$ to $\uref_t(x)$ may be extended to an analogous statement relating $\uref_t(x|z,y)$ to $\uref_t(x|y)$. We do not prove these here for brevity, but encourage the reader to do so on their own time.} 
+To gain intuition for classifier-free guidance, we can use \cref{prop:conversion_formula_gaussian_prob_path} to rewrite the guided vector field $\uref_t(x|y)$ in the following form using the guided score function $\nabla\log p_t(x|y)$
+\begin{equation}
+    \uref_t(x|y) = a_tx + b_t\nabla \log p_t(x|y),
+\end{equation}
+where 
+\begin{equation}
+   (a_t, b_t) = \left(\frac{\dot{\alpha}_t}{\alpha_t}, \frac{\dot{\alpha}_t \beta_t^2-\dot{\beta}_t \beta_t \alpha_t}{\alpha_t}\right). 
+\end{equation}
+However, notice that by Bayes' rule, we can rewrite the guided score as
+\begin{equation}
+   \nabla \log p_t(x|y) = \nabla \log \left(\frac{p_t(x)p_t(y|x)}{p_t(y)}\right) = \nabla \log p_t(x) + \nabla \log p_t(y|x), 
+   \label{eq:bayes_rule}
+\end{equation}
+where we used that the gradient $\nabla$ is taken with respect to the variable $x$, so that $\nabla \log p_t(y) = 0$. We may thus rewrite 
+\begin{align*}
+    \uref_t(x|y) = a_tx + b_t(\nabla \log p_t(x) + \nabla \log p_t(y|x)) = \uref_t(x) + b_t \nabla \log p_t(x|y).
+\end{align*}
+Notice the shape of the above equation: The guided vector field $\uref_t(x|y)$ is a sum of the unguided vector field \emph{plus} a guided score $\nabla\log p_t(x|y)$. As people observed that their image $x$ did not fit their prompt $y$ well enough, it was a natural idea to scale up the contribution of the $\nabla \log p_t(y|x)$ term, yielding
+\begin{align*}
+    \tilde{u}_t(x|y) = \uref_t(x) + w b_t \nabla \log p_t(y|x),
+\end{align*}
+where $w > 1$ is known as the \themebf{guidance scale}. Note that this is a heuristic: for $w \neq 1$, it holds that $\tilde{u}_t(x|y) \neq \uref_t(x|y)$, i.e. therefore not the true, guided vector field. However, empirical results have shown to yield preferable results (when $w > 1$). 
+\begin{remarkbox}[Where is the classifier?]
+The term $\log p_t(y|x)$ can be considered as a sort of classifier of noised data (i.e. it gives the likelihoods of $y$ given $x$). In fact, early works in diffusion trained actual classifiers and used them to the guide via the above procedure. This leads to \themebf{classifier guidance} \cite{classifier_guidance, yangsong_sde}. As it has been largely superseded by classifier-free guidance, we do not consider it here. 
+\end{remarkbox}
+
+We may again apply the equality $$\nabla \log p_t(x|y) = \nabla \log p_t(x) + \nabla \log p_t(y|x)$$ to obtain 
+\begin{align*}\tilde{u}_t(x|y) &= \uref_t(x) + w b_t \nabla \log p_t(y|x)\\
+&= \uref_t(x) + w b_t (\nabla \log p_t(x|y) - \nabla \log p_t(x))\\
+&= \uref_t(x) - (w a_tx + w b_t \nabla \log p_t(x)) + (w a_t x + w b_t \nabla \log p_t(x|y))\\
+&= (1-w) \uref_t(x) + w \uref_t(x|y).\end{align*}
+We may therefore express the scaled guided vector field $\tilde{u}_t(x|y)$ as the linear combination of the unguided vector field $\uref_t(x)$ with the guided vector field $\uref_t(x|y)$. The idea might then to to train both an unguided $\uref_t(x)$ (using e.g., \cref{eq:cfm}) as well as a guided $\uref_t(x|y)$ (using e.g., \cref{eq:guided_cfm}), and then combine them at inference time to obtain $\tilde{u}_t(x|y)$. "But wait!", you might ask, "wouldn't we need to train two models then !?". It turns out we do can train both in model: we may thus augment our label set with a new, additional $\varnothing$ label that denotes \textbf{the absence of conditioning}. We can then treat $\uref_t(x)=\uref_t(x|\varnothing)$. With that, we do not need to train a separate model to reinforce the effect of a hypothetical classifier. This approach of training a conditional and unconditional model in one (and subsequently reinforcing the conditioning) is known as \themebf{classifier-free guidance} (CFG) \cite{cfg}. 
+
+\begin{remarkbox}[Derivation for general probability paths]
+Note that the construction
+\begin{equation*}
+    \tilde{u}_t(x|y) = (1-w) \uref_t(x) + w \uref_t(x|y),
+\end{equation*}
+is equally valid for any choice probability path, not just a Gaussian one. When $w=1$, it is straightforward to verify that $\tilde{u}_t(x|y)=\uref_t(x|y)$. Our derivation using Gaussian paths was simply to illustrate the intuition behind the construction, and in particular of amplifying the contribution of a ``classifier'' $\nabla \log p_t(y|x)$.
+\end{remarkbox}
+
+\paragraph{Training and Context-Free Guidance.} We must now amend the guided conditional flow matching objective from \cref{eq:guided_cfm} to account for the possibility of $y = \varnothing$. The challenge is that when sampling $(z,y) \sim \pdata$, we will never obtain $y = \varnothing$. It follows that we must introduce the possibility of $y = \varnothing$ artificially. To do so, we will define some hyperparameter $\eta$ to be the probability that we discard the original label $y$, and replace it with $\varnothing$. We thus arrive at our \themebf{CFG conditional flow matching training objective}
+\begin{align}
+    \mathcal{L}_{\text{CFM}}^{\text{CFG}}(\theta) &= \,\,\mathbb{E}_{\square} \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2\\
+    \square &= (z,y) \sim p_{\text{data}}(z,y),\, t \sim \text{Unif}[0,1),\, x \sim p_t(\cdot|z),\text{replace }y=\varnothing\text{ with prob. }\eta
+\end{align}
+We summarize our findings below.
+
+\begin{summarybox}[Classifier-Free Guidance for Flow Models]
+Given the unguided marginal vector field $\uref_t(x|\varnothing)$, the guided marginal vector field $\uref_t(x|y)$, and a \themebf{guidance scale} $w > 1$, we define the \themebf{classifier-free guided vector field} $\tilde{u}_t(x|y)$ by 
+\begin{equation}
+    \tilde{u}_t(x|y) = (1-w) \uref_t(x|\varnothing) + w \uref_t(x|y).
+    \label{eq:flow_cfg}
+\end{equation}
+By approximating $\uref_t(x|\varnothing)$ and $\uref_t(x|y)$ using the same neural network, we may leverage the following \themebf{classifier-free guidance CFM} (CFG-CFM) objective, given by
+\begin{align}
+    \label{eq:cfg_guided_cfm}
+    \mathcal{L}_{\text{CFM}}^{\text{CFG}}(\theta) &= \,\,\mathbb{E}_{\square} \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2\\
+    \square &= (z,y) \sim p_{\text{data}}(z,y),\, t \sim \text{Unif}[0,1),\, x \sim p_t(\cdot|z),\text{replace }y=\varnothing\text{ with prob. }\eta
+\end{align}
+In plain English, $\mathcal{L}_{\text{CFM}}^{\text{CFG}}$ might be approximated by
+\begin{alignat*}{3}
+    (z,y) &\sim \pdata(z,y) \quad\quad\quad\quad && \blacktriangleright \quad \text{Sample $(z,y)$ from data distribution.}\\
+    t &\sim \text{Unif}[0,1) \quad\quad\quad\quad && \blacktriangleright \quad \text{Sample $t$ uniformly on $[0,1)$.}\\
+    x &\sim p_t(x|z) \quad\quad\quad\quad && \blacktriangleright \quad \text{Sample $x$ from the conditional probability path $p_t(x|z)$.}\\
+    \text{with prob.}&\,\eta,\, y \gets \varnothing \quad\quad\quad\quad && \blacktriangleright \quad \text{Replace $y$ with $\varnothing$ with probability $\eta$.}\\
+    \widehat{\mathcal{L}_{\text{CFM}}^{\text{CFG}}(\theta)} &=  \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2 \quad\quad\quad\quad && \blacktriangleright \quad \text{Regress model against conditional vector field.}
+\end{alignat*}
+Above, we made use multiple times of the fact that $\uref_t(x|z) = \uref_t(x|z,y)$. At inference time, for a fixed choice of $y$, we may sample via
+\begin{alignat*}{3}
+    \textbf{\sffamily Initialization:}\quad X_0&\sim\pinit(x) \quad  && \blacktriangleright\,\,\text{Initialize with simple distribution (such as a Gaussian)}\\
+    \textbf{\sffamily Simulation:}\quad \dd X_t &= \tilde{u}_t^\theta(X_t|y)\dd t \quad && \blacktriangleright\,\,\text{Simulate ODE from $t=0$ to $t=1$.}\\
+    \textbf{\sffamily Samples:}\quad X_1& \quad && \blacktriangleright\,\,\text{Goal is for $X_1$ to adhere to the guiding variable $y$.}
+\end{alignat*}
+\end{summarybox}
+Note that the distribution of $X_1$ is not necessarily aligned with $X_1 \sim  \pdata(\cdot | y)$ anymore if we use a weight $w>1$. However, empirically, this shows better alignment with conditioning.
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/salimans_cfg.png}
+    \caption{The effect of classifier guidance. The prompt here is the "class" chosen to be "Corgi" (a specific type of dog). Left: samples generated with no guidance (i.e., $w = 1$). Right: samples generated with classifier guidance and $w = 4$. As shown, classifier-free guidance improves the similarity to the prompt. Figure taken from \cite{cfg}.}
+    \label{fig:guidance}
+\end{figure}
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/guidance.png}
+    \caption{The effect of classifier-free guidance applied at various guidance scales for the MNIST dataset of hand-written digits. Left: Guidance scale set to $w = 1.0$. Middle: Guidance scale set to $w = 2.0$. Right: Guidance scale set to $w = 4.0$. You will generate a similar image yourself in the lab three!}
+    \label{fig:mnist_guidance}
+\end{figure}
+In \cref{fig:guidance}, we illustrate class-based classifier-free guidance on 128x128 ImageNet, as in \cite{cfg}. Similarly, in \cref{fig:mnist_guidance}, we visualize the affect of various guidance scales $w$ when applying classifier-free guidance to sampling from the MNIST dataset of handwritten digits.
+
+\begin{algorithm}[h]
+\caption{Classifier-free guidance training for Gaussian probability path $p_t(x|z)=\mathcal{N}(x;\alpha_tz,\beta_t^2I_d)$}
+\label{alg:training_fm_score_matching_gaussian_paths}
+\begin{algorithmic}[1]
+\REQUIRE Paired dataset $(z,y)\sim \pdata$, neural network $u_t^\theta$
+\FOR{each mini-batch of data}
+    \STATE Sample a data example $(\dap,y)$ from the dataset.
+    \STATE Sample a random time $t \sim \text{Unif}_{[0,1]}$.
+    \STATE Sample noise $\epsilon\sim\mathcal{N}(0,I_d)$
+    \STATE Set $x=\alpha_t z + \beta_t \epsilon$
+    % \hfill (\text{General case: }$x\sim p_t(\cdot|z)$)
+    % %\IF{Flow matching}
+    \STATE With probability $p$ drop label: $y\leftarrow \varnothing$
+    \STATE Compute loss
+    \begin{align*}
+        \mathcal{L}(\theta) =& \|u_t^\theta(x|y)-(\dot{\alpha}_t\epsilon+\dot{\beta}_tz)\|^2 
+    \end{align*}
+    \STATE Update the model parameters $\theta$ via gradient descent on $\mathcal{L}(\theta)$.
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Guidance for Diffusion Models}
+In this section we extend the reasoning of the previous section to diffusion models. First, in the same way that we obtained \cref{eq:guided_cfm}, we may generalize the conditional score matching loss \cref{eq:dsm} to obtain the \themebf{guided conditional score matching objective}
+\begin{align}
+    \label{eq:guided_dsm}
+    \mathcal{L}_{\text{CSM}}^{\text{guided}}(\theta) &= \mathbb{E}_{\square}[\|s_t^\theta(x|y) - \nabla\log p_t(x|\dap)\|^2]\\
+    \square &= (z,y)\sim \pdata(z,y), \,t\sim \text{Unif},\,x\sim p_t(\cdot|\dap).
+\end{align}
+A guided score network $s_t^\theta(x|y)$ trained with \cref{eq:guided_dsm} might then be combined with the guided vector field $u_t^\theta(x|y)$ to simulate the SDE
+\begin{equation*}
+    X_0 \sim \pinit,\quad \dd X_t = \left[u_t^\theta(X_t|y)+\frac{\sigma_t^2}{2}s_t^\theta(X_t|y)\right]\dd t + \sigma_t\dd W_t.
+\end{equation*}
+
+\paragraph{Classifier-Free Guidance.} We now extend the classifier-free guidance construction to the diffusion setting. By Bayes' rule (see \cref{eq:bayes_rule}),
+\begin{equation*}
+    \nabla \log p_t(x|y) = \nabla \log p_t(x) + \nabla \log p_t(y|x),
+\end{equation*}
+so that for \themebf{guidance scale} $w > 1$ we may define
+\begin{align*}
+    \tilde{s}_t(x|y) &= \nabla \log p_t(x) + w \nabla \log p_t(y|x)\\
+                    &= \nabla \log p_t(x) + w (\nabla \log p_t(x|y) - \nabla \log p_t(x))\\
+                    &= (1-w) \nabla \log p_t(x) + w \nabla \log p_t(x|y)\\
+                    &= (1-w) \nabla \log p_t(x|\varnothing) + w \nabla \log p_t(x|y)
+\end{align*}
+We thus arrive at the CFG-compatible (that is, accounting for the possibility of $\varnothing$) objective 
+\begin{align}
+    \label{eq:cfg_guided_dsm}
+    \mathcal{L}_{\text{DSM}}^{\text{CFG}}(\theta) &= \,\,\mathbb{E}_{\square} \lVert s_t^{\theta}(x|y) - \nabla \log p_t(x|z)\rVert^2\\
+    \square &= (z,y) \sim p_{\text{data}}(z,y),\, t \sim \text{Unif}[0,1),\, x \sim p_t(\cdot|z),\,\text{replace }y=\varnothing\text{ with prob. }\eta,
+\end{align}
+where $\eta$ is a hyperparameter (the probability of replacing $y$ with $\varnothing$). We will refer $\mathcal{L}_{\text{CSM}}^{\text{CFG}}(\theta)$ as the \themebf{guided conditional score matching objective}. We recap as follows
+
+\begin{summarybox}[Classifier-Free Guidance for Diffusions]
+Given the unguided marginal score $\nabla \log p_t(x|\varnothing)$, the guided marginal score field $\nabla \log p_t(x|y)$, and a \themebf{guidance scale} $w > 1$, we define the \themebf{classifier-free guided score} $\tilde{s}_t(x|y)$ by 
+\begin{equation}
+    \tilde{s}_t(x|y) = (1-w) \nabla \log p_t(x|\varnothing) + w \nabla \log p_t(x|y).
+    \label{eq:flow_cfg}
+\end{equation}
+By approximating $\nabla \log p_t(x|\varnothing)$ and $\nabla \log p_t(x|y)$ using the same neural network $s_t^\theta(x|y)$, we may leverage the following \themebf{classifier-free guidance CSM} (CFG-CSM) objective, given by
+\begin{align}
+    \label{eq:cfg_guided_dsm}
+    \mathcal{L}_{\text{CSM}}^{\text{CFG}}(\theta) &= \,\,\mathbb{E}_{\square} \lVert s_t^{\theta}(x|(1-\xi)y + \xi \varnothing) - \nabla \log p_t(x|z)\rVert^2\\
+    \square &= (z,y) \sim p_{\text{data}}(z,y),\, t \sim \text{Unif}[0,1),\, x \sim p_t(\cdot|z),\,\text{replace }y=\varnothing\text{ with prob. }\eta
+\end{align}
+In plain English, $\mathcal{L}_{\text{DSM}}^{\text{CFG}}$ might be approximated by
+\begin{alignat*}{3}
+    (z,y) &\sim \pdata(z,y) \quad\quad\quad\quad && \blacktriangleright \quad \text{Sample $(z,y)$ from data distribution.}\\
+    t &\sim \text{Unif}[0,1) \quad\quad\quad\quad && \blacktriangleright \quad \text{Sample $t$ uniformly on $[0,1)$.}\\
+    x &\sim p_t(x|z,y) \quad\quad\quad\quad && \blacktriangleright \quad \text{Sample $x$ from cond. path $p_t(x|z)$.}\\
+    \text{with prob.}&\,\eta,\, y \gets \varnothing \quad\quad\quad\quad && \blacktriangleright \quad \text{Replace $y$ with $\varnothing$ with probability $\eta$.}\\
+    \widehat{\mathcal{L}_{\text{DSM}}^{\text{CFG}}}(\theta) &=  \lVert s_t^{\theta}(x|y) - \nabla \log p_t(x|z)\rVert^2 \quad\quad\quad\quad && \blacktriangleright \quad \text{Regress model against conditional score.}
+\end{alignat*}
+At inference time, for a fixed choice of $w > 1$, we may combine $s_t^\theta(x|y)$ with a guided vector field $u_t^\theta(x|y)$ and define
+\begin{align*}
+    \tilde{s}^\theta_t(x|y) &= (1-w) s_t^\theta(x|\varnothing) + w s_t^\theta(x|y),\\
+    \tilde{u}^\theta_t(x|y) &= (1-w) u_t^\theta(x|\varnothing) + wu_t^\theta (x|y).
+\end{align*}
+Then we may sample via
+\begin{alignat*}{3}
+    \textbf{\sffamily Initialization:}\quad X_0&\sim\pinit(x) \quad  && \blacktriangleright\,\,\text{Initialize with simple distribution (such as a Gaussian)}\\
+    \textbf{\sffamily Simulation:}\quad \dd X_t &= \left[\tilde{u}_t^\theta(X_t|y)+\frac{\sigma_t^2}{2}\tilde{s}_t^\theta(X_t|y)\right]\dd t + \sigma_t\dd W_t \quad && \blacktriangleright\,\,\text{Simulate SDE from $t=0$ to $t=1$.}\\
+    \textbf{\sffamily Samples:}\quad X_1& \quad && \blacktriangleright\,\,\text{Goal is for $X_1$ to adhere to the guiding variable $y$.}
+\end{alignat*}
+\end{summarybox}
+
+\subsection{Neural network architectures}
+
+\label{sec:image_architecture}
+We next discuss the design of neural networks for flow and diffusion models. Specifically, we answer the question of how to construct a neural network architecture that represents the (guided) vector field $u_t^\theta(x|y)$ with parameters $\theta$. Note that the neural network must have 3 inputs - a vector $x\in\R^d$, a conditioning variable $y\in\mathcal{Y}$, and a time value $t\in [0,1]$ - and one output - a vector $u_t^\theta(x|y)\in\mathbb{R}^d$. For low-dimensional distributions (e.g. the toy distributions we have seen in previous sections), it is sufficient to parameterize $u_t^\theta(x|y)$ as a multi-layer perceptron (MLP), otherwise known as a fully connected neural network. That is, in this simple setting, a forward pass through $u_t^\theta(x|y)$ would involve concatenating our input $x$, $y$, and $t$, and passing them through an MLP. However, for complex, high-dimensional distributions, such as those over images, videos, and proteins, an MLP is rarely sufficient, and it is common to use special, application-specific architectures. For the remainder of this section, we will consider the case of \textbf{images} (and by extension, videos), and discuss two common architectures: the \themebf{U-Net} \citep{ronneberger2015u}, and the \themebf{diffusion transformer} (DiT).\\
+
+\subsubsection{U-Nets and Diffusion Transformers}
+Before we dive into the specifics of these architectures, let us recall from the introduction that an image is simply a vector $x \in \mathbb{R}^{C_{\text{image}} \times H \times W}$. Here $C_{\text{image}}$ denotes the number of \themebf{channels} (an RGB image typically would have $C_{\text{input}} = 3$ color channels), $H$ denotes the \themebf{height} of the image in pixels, and $W$ denotes the \themebf{width} of the image in pictures. %As we will soon see with the U-Net, the channel dimension is often used as a means to introduce deeper, latent features. 
+
+\paragraph{U-Nets.} The \themebf{U-Net} architecture \citep{ronneberger2015u} is a specific type of convolutional neural network. Originally designed for image segmentation, its crucial feature is that both its input and its output have the shape of images (possibly with a different number of channels). This makes it ideal to parameterize a vector field $x\mapsto u_t^\theta(x|y)$ as for fixed $y,t$ its input has the shape of an image and its output does, too. Therefore, U-Net were widely used in the development of diffusion models. A U-Net consists of a series of \themebf{encoders} $\mathcal{E}_i$, and a corresponding sequence of \themebf{decoders} $\mathcal{D}_i$, along with a latent processing block in between, which we shall refer to as a \themebf{midcoder} (midcoder is a term is not used in the literature usually). For sake of example, let us walk through the path taken by an image $x_t \in \mathbb{R}^{3 \times 256 \times 256}$ (we have taken $(C_{\text{input}}, H, W) = (3, 256, 256)$) as it is processed by the U-Net:
+\begin{alignat*}{3}
+    x^{\text{input}}_t &\in \mathbb{R}^{3 \times 256 \times 256} \quad  
+    && \blacktriangleright\,\,\text{Input to the U-Net.}\\
+    x^{\text{latent}}_t = \mathcal{E}(x^{\text{input}}_t) &\in \mathbb{R}^{512 \times 32 \times 32} \quad && \blacktriangleright\,\,\text{Pass through encoders to obtain latent.}\\
+    x^{\text{latent}}_t = \mathcal{M}(x^{\text{latent}}_t) &\in \mathbb{R}^{512 \times 32 \times 32} \quad && \blacktriangleright\,\,\text{Pass latent through midcoder.}\\
+    x^{\text{output}}_t = \mathcal{D}(x^{\text{latent}}_t) &\in \mathbb{R}^{3 \times 256 \times 256} \quad && \blacktriangleright\,\,\text{Pass through decoders to obtain output.}
+\end{alignat*}
+Notice that as the input passes through the encoders, the number of channels in its representation increases, while the height and width of the images are decreased. Both the encoder and the decoder usually consist of a series of convolutional layers (with activation functions, pooling operations, etc. in between). Not shown above are two points: First, the input $x^{\text{input}}_t\in \mathbb{R}^{3 \times 256 \times 256}$ is often fed into an initial pre-encoding block to increase the number of channels before being fed into the first encoder block. Second, the encoders and decoders are often connected by \themebf{residual connections}. The complete picture is shown in \cref{fig:unet}.
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/unet.png}
+    \caption{The simplified U-Net architecture used in lab three.}
+    \label{fig:unet}
+\end{figure}
+At a high level, most U-Nets involve some variant of what is described above. However, certain of the design choices described above may well differ from various implementations in practice. In particular, we opt above for a purely-convolutional architecture whereas it is common to include attention layers as well throughout the encoders and decoders. The U-Net derives its name from the ``U''-like shape formed by its encoders and decoders (see \cref{fig:unet}).
+
+\paragraph{Diffusion Transformers.} One alternative to U-Nets are \themebf{diffusion transformers} (DiTs), which dispense with convolutions and purely use \themebf{attention} \cite{attention, dit}. Diffusion transformers are based on \themebf{vision transformers} (ViTs), in which the big idea is essentially to divide up an image into patches, embed each of these patches, and then attend between the patches \cite{vit}. \themeit{Stable Diffusion 3}, trained with conditional flow matching, parameterizes the velocity field $u_t^{\theta}(x)$ as a modified DiT, as we discuss later in \cref{sec:large_scale_models} \cite{sd3}.
+
+\begin{remarkbox}[Working in Latent Space]
+A common problem for large-scale applications is that the data is so high-dimensional that it consumes too much memory. For example, we might want to generate a high resolution image of $1000\times 10000$ pixels leading to $1$ million (!) dimensions. To reduce memory usage, a common design pattern is to work in a \themebf{latent space} that can be considered a compressed version of our data at lower resolution.  Specifically, the usual approach is to combine a flow or diffusion model with a (variational) \themebf{autoencoder} \cite{latent_diffusion}. In this case, one first encodes the training dataset in the \themebf{latent space} via an autoencoder, and then training the flow or diffusion model in the latent space. Sampling is performed by first sampling in the latent space using the trained flow or diffusion model, and then decoding of the output via the decoder. Intuitively, a well-trained autoencoder can be thought of as filtering out semantically meaningless details, allowing the generative model to ``focus'' on important, perceptually relevant features \cite{latent_diffusion}. By now, nearly all state-of-the-art approaches to image and video generation involve training a flow or diffusion model in the latent space of an autoencoder - so called \themebf{latent diffusion models} \citep{latent_diffusion,vahdat2021score}. However, it is important to note: one also needs to train the autoencoder before training the diffusion models. Crucially, performance now depends also on how good the autoencoder compresses images into latent space and recovers aesthetically pleasing images.
+\end{remarkbox}
+\subsubsection{Encoding the Guiding Variable.} 
+Up until this point, we have glossed over how exactly the guiding (conditioning) variable $y$ is fed into the neural network $u_t^\theta(x|y)$. Broadly, this process can be decomposed into two steps: embedding the raw input $y_{\text{raw}}$ (e.g., the text prompt ``a cat playing a trumpet, photorealistic'') into some vector-valued input $y$, and feeding the resulting $y$ into the actual model. We now proceed to describe each step in greater detail.
+
+\paragraph{Embedding Raw Input.} Here, we'll consider two cases: (1) where $y_{\text{raw}}$ is a discrete class-label, and (2) where $y_{\text{raw}}$ is a text-prompt. When $y_{\text{raw}} \in \mathcal{Y} \triangleq \{0,\dots, N\}$ is just a class label, then it is often easiest to simply learn a separate embedding vector for each of the $N+1$ possible values of $y_{\text{raw}}$, and set $y$ to this embedding vector. One would consider the parameters of these embeddings to be included in the parameters of $u_t^\theta(x|y)$, and would therefore learn these during training. When $y_{\text{raw}}$ is a text-prompt, the situation is more complex, and approaches largely rely on frozen, pre-trained models. Such models are trained to embed a discrete text input into a continuous vector that captures the relevant information. One such model is known as \themebf{CLIP} (Contrastive Language-Image Pre-training). CLIP is trained to learn a shared embedding space for both images and text-prompts, using a training loss designed to encourage image embeddings to be close to their corresponding prompts, while being farther from the embeddings of other images and prompts \cite{clip}. We might therefore take $y = \text{CLIP}(y_{\text{raw}}) \in \mathbb{R}^{d_{\text{CLIP}}}$ to be the embedding produced by a frozen, pre-trained CLIP model. In certain cases, it may be undesirable to compress the entire sequence into a single representation. In this case, one might additionally consider embedding the prompt using a pre-trained transformer so as to obtain a sequence of embeddings. It is also common to combine multiple such pretrained embeddings when conditioning so as to simultaneously reap the benefits of each model \cite{sd3, moviegen}.
+
+\begin{figure}[!t]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/dit.png}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/clip.png}
+  \label{fig:sub2}
+\end{subfigure}
+\caption{Left: An overview of the diffusion transformer architecture, taken from \cite{dit}. Right: A schematic of the contrastive CLIP loss, in which a shared image-text embedding space is learned, taken from \cite{clip}.}
+\label{fig:test}
+\end{figure}
+
+\paragraph{Feeding in the Embedding.} Suppose now that we have obtained our embedding vector $y \in \mathbb{R}^{d_y}$. Now what? The answer varies, but usually it is some variant of the following: feed it individually into every sub-component of the architecture for images. Let us briefly describe how this is accomplished in the U-Net implementation used in lab three, as depicted in \cref{fig:unet}. At some intermediate point within the network, we would like to inject information from $y \in \mathbb{R}^{d_y}$ into the current activation $x^{\text{intermediate}}_t \in \mathbb{R}^{C \times H \times W}$. We might do so using the procedure below, given in PyTorch-esque pseudocode.
+
+\begin{align*}
+    y &= \text{MLP}(y) \in \mathbb{R}^C\quad 
+    && \blacktriangleright\,\,\text{Map $y$ from $\mathbb{R}^{d_y}$ to $\mathbb{R}^C$.}\\
+    y &= \text{reshape}(y) \in \mathbb{R}^{C \times 1 \times 1}\quad 
+    && \blacktriangleright\,\,\text{Reshape $y$ to ``look'' like an image.}\\
+    x^{\text{intermediate}}_t &= \text{broadcast\_add}(x^{\text{intermediate}}_t,y) \in \mathbb{R}^{C \times H \times W}\quad && \blacktriangleright\,\,\text{Add $y$ to $x^{\text{intermediate}}_t$ pointwise.}
+\end{align*}
+
+One exception to this simple-pointwise conditioning scheme is when we have a sequence of embeddings as produced by some pretrained language model. In this case, we might consider using some sort of cross-attention scheme between our image (suitably patchified) and the tokens of the embedded sequence. We will see multiple examples of this in \cref{sec:large_scale_models}.
+
+\subsection{A Survey of Large-Scale Image and Video Models}
+\label{sec:large_scale_models}
+We conclude this section by briefly examining two large-scale generative models: \themeit{Stable Diffusion 3} for image generation and Meta's \themeit{Movie Gen Video} for video generation \citep{sd3, moviegen}. As you will see, these models use the techniques we have described in this work along with additional architectural enhancements to both scale and accommodate richly structured conditioning modalities, such as text-based input.
+
+\subsubsection{Stable Diffusion 3}
+
+Stable Diffusion is a series of state-of-the-art image generation models. These models were among the first to use large-scale latent diffusion models for image generation. If you have not done so, we highly recommend testing it for yourself online (\url{https://stability.ai/news/stable-diffusion-3}).\\
+
+%\paragraph{Training Objective.} 
+Stable Diffusion 3 uses the same conditional flow matching objective that we study in this work (see \cref{alg:training_fm_score_matching_gaussian_paths}).\footnote{In their work, they use a different convention to condition on the noise. But this is only notation and the algorithm is the same.} As outlined in their paper, they extensively tested various flow and diffusion alternatives and found flow matching to perform best. For training, it uses classifier-free guidance training (with dropping class labels) as outlined above. Further, Stable Diffusion 3 follows the approach outlined in \cref{sec:image_architecture} by training within the latent space of a pre-trained autoencoder. Training a good autoencoder was a big contribution of the first stable diffusion papers.\\
+
+To enhance text conditioning, Stable Diffusion 3 makes use of both 3 different types of text embeddings (including CLIP embeddings as well as the sequential outputs produced by a pretrained instance of the encoder of Google's T5-XXL \cite{t5}, and similar to approaches taken in \cite{balaji, saharia}). Whereas CLIP embeddings provide a coarse, overarching embedding of the input text, the T5 embeddings provide a more granular level of context, allowing for the possibility of the model attending to particular elements of the conditioning text. To accommodate these sequential context embeddings, the authors then propose to extend the diffusion transformer to attend not just to patches of the image, but to the text embeddings as well, thereby extending the conditioning capacity from the class-based scheme originally proposed for DiT to sequential context embeddings. This proposed modified DiT is referred to as a \themebf{multi-modal DiT} (MM-DiT), and is depicted in \cref{fig:mmdit}. Their final, largest model has \textbf{8 billion parameters}. For sampling, they use $50$ steps (i.e. they have to evaluate the network $50$ times) using a Euler simulation scheme and a classifier-free guidance weight between $2.0$-$5.0$.
+% \begin{equation}
+% \label{eq:sd3_cfm}
+% \begin{aligned}
+%     \Lcond(\theta) &=  \mathbb{E}_{\square}[\|u_t^\theta(x_t) - \uref_t(x_t|\varepsilon)\|^2]\\
+%     \square &= \varepsilon \sim \mathcal{N}(0, I_d), x_t\sim p_t(\cdot|\varepsilon)
+% \end{aligned}
+% \end{equation}
+% where $p_0 = \mathcal{N}(0, I_d)$. 
+% Note that \cref{eq:sd3_cfm} differs from \cref{eq:cfm} in that we condition on $\varepsilon \in p_0 = \mathcal{N}(0,I_d)$ rather than $z \in p_{\text{data}}$. The analysis is otherwise fundamentally the same. Here, the conditional probability path $p_t(\cdot | \varepsilon)$ is defined implicitly as the law of the random variable
+% \begin{equation}
+%     X_t \triangleq \alpha_tX_1 + \beta_t \varepsilon, \quad \quad X_1 \sim p_{\text{data}},
+% \end{equation}
+% where $\alpha_t,\beta_t \in \mathcal{C}^2([0,1])$ satisfy $\alpha_0 = \beta_1 = 0$ and $\alpha_1 = \beta_0 = 1$ \cite{albergo2023stochastic}. Then, \cref{eq:sd3_cfm} may be modified to the general conditional setting as in \cref{eq:cfg_guided_cfm}.
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/mmdit.png}
+    \caption{The architecture of the multi-modal diffusion transformer (MM-DiT) proposed in \citep{sd3}. Figure also taken from \citep{sd3}.}
+    \label{fig:mmdit}
+\end{figure}
+
+%\paragraph{Architecture.}
+
+\subsubsection{Meta Movie Gen Video}
+Next, we discuss Meta's video generator, \themeit{Movie Gen Video} (\url{https://ai.meta.com/research/movie-gen/}). As the data are not images but \themeit{videos},  the data $x$ lie in the space $\mathbb{R}^{T \times C \times H \times W}$ where $T$ represents the new \themebf{temporal} dimension (i.e. the number of frames). As we shall see, many of the design choices made in this video setting can be seen as adapting existing techniques (e.g., autoencoders, diffusion transformers, etc.) from the image setting to handle this extra temporal dimension.\\
+
+%\footnote{The paper actually proposes a slightly different path given instead by the interpolant $X_t = tz + (1-(1-\sigma_{\text{min}})t)X_0$ where $\sigma_{\text{min}} = 10^{-5}$.}.
+% \begin{equation}
+% \label{eq:moviegen_cfm}
+% \begin{aligned}
+%     \Lcond(\theta) &=  \mathbb{E}_{\square}[\|u_t^\theta(x_t) - \uref_t(x_t|z)\|^2]\\
+%     \square &= z \sim p_{\text{data}}, x_t \sim p_t(\cdot|z),
+% \end{aligned}
+% \end{equation}
+% where the linear (CondOT) probability path $p_t(x_t|z)$ is given implicitly as the law of the interpolant
+% \begin{equation}
+%     X_t = tz + (1-t)X_0, \quad \quad X_0 \sim p_0 = \mathcal{N}(0, I_d)
+% \end{equation}
+%so that the conditional vector field $\uref_t(x_t|z)$ is given by $\frac{z - x_t}{1-t}$.
+%\paragraph{Architecture.} 
+Movie Gen Video utilizes the conditional flow matching objective with the same CondOT path (see \cref{alg:training_fm_score_matching_gaussian_paths}). Like Stable Diffusion 3, Movie Gen Video also operates in the latent space of frozen, pretrained autoencoder. Note that the autoencoder to reduce memory consumption is even more important for videos than for images - which is why most video generators right now are pretty limited in the length of the video they generate.
+% For brevity, we focus on three specific architectural design choices: the autoencoder, the diffusion-transformer backbone, and the conditioning mechanism. Like Stable Diffusion 3, Movie Gen Video also operates in the latent space of frozen, pretrained autoencoder. 
+Specifically, the authors propose to handle the added time dimension by introducing a \themebf{temporal autoencoder} (TAE) which maps a raw video $x_t' \in \mathbb{R}^{T' \times 3 \times H \times W}$ to a latent $x_t\in\mathbb{R}^{T \times C \times H \times W}$, with $\tfrac{T'}{T} = \tfrac{H'}{H} = \tfrac{W'}{W} = 8$ \cite{moviegen}. To accomodate long videos, a temporal tiling procedure is proposed by which the video is chopped up into pieces, each piece is encoder separately, and the latents are sticthed together \cite{moviegen}. The model itself - that is, $u_t^\theta(x_t)$ - is given by a DiT-like backbone in which $x_t$ is patchified along the time and space dimensions. The image patches are then passed through a transformer employing both self-attention among the image patches, and cross-attention with language model embeddings, similar to the MM-DiT employed by Stable Diffusion 3. For text conditioning, Movie Gen Video employs three types of text embeddings: UL2 embeddings, for granular, text-based reasoning \cite{ul2}, ByT5 embeddings, for attending to character-level details (for e.g., prompts explicitly requesting specific text to be present) \cite{byte5}, and MetaCLIP embeddings, trained in a shared text-image embedding space \cite{metaclip, moviegen}. Their final, largest model has \textbf{30 billion parameters}. For a significantly more detailed and expansive treatment, we encourage the reader to check out the Movie Gen technical report itself \citep{moviegen}.
+
+
