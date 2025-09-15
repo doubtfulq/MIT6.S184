@@ -1,0 +1,20 @@
+# ignore latex intermediate files
+*.aux
+*.log
+*.out
+*.toc
+*.lot
+*.lof
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bcf
+*.run.xml
+*.maf
+*.xdv
+*.mtc
+*.bbl
+*.pdf
+*.mtc0
