@@ -2,6 +2,8 @@
 \label{sec:odes_sdes}
 In the previous section, we formalized generative modeling as sampling from a data distribution $\pdata$. Further, we saw that sampling could be achieved via the transformation of samples from a simple distribution $\pinit$, such as the Gaussian $\mathcal{N}(0,I_d)$, to samples from the target distribution $\pdata$. In this section, we describe how the desired transformation can be obtained as the simulation of a suitably constructed differential equation. For example, flow matching and diffusion models involve simulating \themebf{ordinary differential equations} (ODEs) and \themebf{stochastic differential equations} (SDEs), respectively. The goal of this section is therefore to define and construct these generative models as they will be used throughout the remainder of the notes. Specifically, we first define ODEs and SDEs, and discuss their simulation. Second, we describe how to parameterize an ODE/SDE using a deep neural network. This leads to the definition of a flow and diffusion model and the fundamental algorithms to sample from such models. In later sections, we then explore how to train these models.
 
+在前一节中，我们将生成建模形式化为从数据分布$\pdata$中采样。此外，我们看到可以通过将简单分布$\pinit$（如高斯分布$\mathcal{N}(0,I_d)$）的样本转换为目标分布$\pdata$的样本来实现采样。在本节中，我们描述如何通过模拟适当构造的微分方程来获得所需的变换。例如，流匹配和扩散模型分别涉及模拟\themebf{常微分方程}（ODEs）和\themebf{随机微分方程}（SDEs）。因此，本节的目标是定义和构造这些生成模型，因为它们将在笔记的其余部分中使用。具体来说，我们首先定义ODEs和SDEs，并讨论它们的模拟。其次，我们描述如何使用深度神经网络参数化ODE/SDE。这导致了流模型和扩散模型的定义以及从此类模型采样的基本算法。在后面的章节中，我们将探讨如何训练这些模型。
+
 % \paragraph{Note.} We remark that there are other ways to transform $\pinit$ into $\pdata$ other than ODEs/SDEs. We focus on ODEs/SDEs because they represent the current state-of-the-art but just keep in mind that many other ways have been proposed over the course of the history of machine learning offering unique advantages and disadvantages.
 
 \subsection{Flow Models}
@@ -15,6 +17,16 @@ that maps from time $t$ to some location in space $\mathbb{R}^d$. Every ODE is d
 u:\mathbb{R}^d\times [0,1]\to \R^d,\quad (x,t)\mapsto u_t(x),
 \end{align*}
 i.e. for every time $t$ and location $x$ we get a vector $u_t(x)\in\R^d$ specifying a velocity in space (see  \cref{fig:flow}). An ODE imposes a condition on a trajectory: we want a trajectory $X$ that ``follows along the lines'' of the vector field $u_t$, starting at the point $x_0$. We may formalize such a trajectory as being the solution to the equation:
+
+我们首先定义\themebf{常微分方程（ODEs）}。ODE的解由\themebf{轨迹}定义，即形式为
+\begin{align*}
+X: [0,1] \to \R^d, \quad t \mapsto X_t,
+\end{align*}
+的函数，它从时间$t$映射到空间$\mathbb{R}^d$中的某个位置。每个ODE都由\themebf{向量场}$u$定义，即形式为
+\begin{align*}
+u:\mathbb{R}^d\times [0,1]\to \R^d,\quad (x,t)\mapsto u_t(x),
+\end{align*}
+的函数，即对于每个时间$t$和位置$x$，我们得到一个向量$u_t(x)\in\R^d$，指定空间中的速度（见\cref{fig:flow}）。ODE对轨迹施加了一个条件：我们希望轨迹$X$从点$x_0$开始"沿着"向量场$u_t$的线移动。我们可以将这样的轨迹形式化为方程的解：
 \begin{subequations}
     \begin{align} 
       \frac{\dd}{\dd t}X_{t} &= u_t(X_t) &&\blacktriangleright\,\,\text{ODE}\label{e:ode_ode}\\
@@ -22,6 +34,8 @@ i.e. for every time $t$ and location $x$ we get a vector $u_t(x)\in\R^d$ specify
     \end{align}
 \end{subequations}
 \Cref{e:ode_ode} requires that the derivative of $X_t$ is specified by the direction given by $u_t$. \Cref{e:ODE_boundary} requires that we start at $x_0$ at time $t=0$. We may now ask: if we start at $X_0 = x_0$ at $t=0$, where are we at time $t$ (what is $X_t$)? This question is answered by a function called the \themebf{flow}, which is a solution to the ODE
+
+\Cref{e:ode_ode}要求$X_t$的导数由$u_t$给出的方向指定。\Cref{e:ODE_boundary}要求我们在时间$t=0$时从$x_0$开始。我们现在可以问：如果我们在$t=0$时从$X_0 = x_0$开始，那么在时间$t$时我们在哪里（$X_t$是什么）？这个问题由一个称为\themebf{流}的函数回答，它是ODE的解
 \begin{subequations}\label{e:flow}
     \begin{align}
     \psi:\R^d\times [0,1]\mapsto& \R^d,\quad (x_0,t)\mapsto \psi_t(x_0)\\
@@ -31,11 +45,15 @@ i.e. for every time $t$ and location $x$ we get a vector $u_t(x)\in\R^d$ specify
 \end{subequations}
 For a given initial condition $X_0=x_0$, a trajectory of the ODE is recovered via $X_t = \psi_t(X_0)$. Therefore, vector fields, ODEs, and flows are, intuitively, three descriptions of the same object: \textbf{vector fields define ODEs whose solutions are flows}. As with every equation, we should ask ourselves about an ODE: Does a solution exist and if so, is it unique? A fundamental result in mathematics is "yes!" to both, as long we impose weak assumptions on $u_t$:
 
+对于给定的初始条件$X_0=x_0$，ODE的轨迹通过$X_t = \psi_t(X_0)$恢复。因此，向量场、ODEs和流直观上是同一对象的三种描述：\textbf{向量场定义ODEs，其解为流}。就像对每个方程一样，我们应该问自己关于ODE的问题：解是否存在？如果存在，是否唯一？数学中的一个基本结果对这两个问题的答案都是"是的！"，只要我们对$u_t$施加弱假设：
+
 \begin{theorem}[Flow existence and uniqueness]
 \label{thm:ode_existence_and_uniqueness}
 If $u:\R^d\times[0,1]\to\R^d$ is continuously differentiable with a bounded derivative, then the ODE in \eqref{e:flow} has a unique solution given by a flow $\psi_t$. In this case, $\psi_t$ is a \themebf{diffeomorphism} for all $t$, i.e. $\psi_t$ is continuously differentiable with a continuously differentiable inverse $\psi_t^{-1}$.
 \end{theorem}
 Note that the assumptions required for the existence and uniqueness of a flow are almost always fulfilled in machine learning, as we use neural networks to parameterize $u_t(x)$ and they always have bounded derivatives. Therefore, \cref{thm:ode_existence_and_uniqueness} should not be a concern for you but rather good news: \textbf{flows exist and are unique solutions to ODEs in our cases of interest.} A proof can be found in \citep{perko2013differential,coddington1956theory}.
+
+注意，在机器学习中，流的存在性和唯一性所需的假设几乎总是满足的，因为我们使用神经网络来参数化$u_t(x)$，而它们总是具有有界导数。因此，\cref{thm:ode_existence_and_uniqueness}不应该是您担心的问题，而应该是好消息：\textbf{在我们感兴趣的情况下，流存在且是ODEs的唯一解。}证明可以在\citep{perko2013differential,coddington1956theory}中找到。
 
 \begin{figure}
     \centering
@@ -62,6 +80,17 @@ defines a flow $\psi$ solving the ODE in \cref{e:flow}. You can check this yours
     \overset{(i)}{=}-\theta\exp\left(-\theta t\right)x_0\overset{\eqref{e:flow_linear_vf}}{=}-\theta\psi_t(x_0)=u_t(\psi_t(x_0)),
 \end{align*}
 where in (i) we used the chain rule. In \cref{fig:bm_ou_process}, we visualize a flow of this form converging to $0$ exponentially.
+
+让我们考虑一个简单的向量场$u_t(x)$的例子，它是$x$的简单线性函数，即$u_t(x)=-\theta x$，其中$\theta>0$。那么函数
+\begin{align}
+    \psi_t(x_0) =  \exp\left(-\theta t\right)x_0
+\end{align}
+定义了一个解决\cref{e:flow}中ODE的流$\psi$。您可以通过检查$\psi_0(x_0)=x_0$并计算
+\begin{align*}
+    \frac{\dd}{\dd t}\psi_t(x_0) \overset{\eqref{e:flow_linear_vf}}{=}\frac{\dd}{\dd t}\left(\exp\left(-\theta t\right)x_0\right)
+    \overset{(i)}{=}-\theta\exp\left(-\theta t\right)x_0\overset{\eqref{e:flow_linear_vf}}{=}-\theta\psi_t(x_0)=u_t(\psi_t(x_0)),
+\end{align*}
+来自己验证这一点，其中在(i)中我们使用了链式法则。在\cref{fig:bm_ou_process}中，我们可视化了这种形式的流指数收敛到$0$。
 \end{examplebox}
 
 \paragraph{Simulating an ODE.}
@@ -77,6 +106,18 @@ where $h=n^{-1}>0$ is a step size hyperparameter with $n \in \Nat$. For this cla
 \end{alignat*}
 Intuitively, the Heun's method is as follows: it takes a first guess $X_{t+h}'$ of what the next step could be but corrects the direction initially taken via an updated guess.
 
+\paragraph{模拟ODE。}
+一般来说，如果$u_t$不像线性函数那样简单，就不可能明确地计算流$\psi_t$。在这些情况下，我们使用\themebf{数值方法}来模拟ODEs。幸运的是，这是数值分析中一个经典且研究充分的主题，存在无数强大的方法\citep{iserles2009first}。最简单和最直观的方法之一是\themebf{欧拉方法}。在欧拉方法中，我们用$X_0=x_0$初始化，并通过以下方式更新
+\begin{equation}
+X_{t+h} = X_t + h u_t(X_t)\quad (t=0,h,2h,3h,\dots,1-h)
+\end{equation}
+其中$h=n^{-1}>0$是步长超参数，$n \in \Nat$。对于这门课程，欧拉方法就足够了。为了让您体验更复杂的方法，让我们考虑通过更新规则定义的\themebf{Heun方法}
+\begin{alignat*}{3}
+    X_{t+h}'&=X_t+hu_t(X_t)\quad &&\blacktriangleright\,\, \text{新状态的初始猜测}\\
+    X_{t+h} &= X_{t} + \frac{h}{2}(u_t(X_t)+u_{t+h}(X_{t+h}'))\quad &&\blacktriangleright\,\,\text{用当前状态和猜测状态的平均$u$更新}
+\end{alignat*}
+直观地说，Heun方法如下：它首先猜测下一步可能的$X_{t+h}'$，但通过更新的猜测来修正最初采取的方向。
+
 \paragraph{Flow models.} We can now construct a generative model via an ODE. Remember that our goal was to convert a simple distribution $\pinit$ into a complex distribution $\pdata$. The simulation of an ODE is thus a natural choice for this transformation. A \themebf{flow model} is described by the ODE
 \begin{align*}
     X_0 &\sim \pinit  &&\blacktriangleright\,\,\text{random initialization} \\
@@ -87,6 +128,17 @@ where the vector field $u_t^\theta$ is a neural network $u_t^\theta$ with parame
     X_1 \sim \pdata \quad \Leftrightarrow \quad \psi_1^\theta(X_0)\sim \pdata
 \end{align*}
 where $\psi_t^\theta$ describes the flow induced by $u_t^\theta$. Note however: although it is called \themeit{flow model}, \textbf{the neural network parameterizes the vector field, not the flow}. In order to compute the flow, we need to simulate the ODE. In \cref{alg:sampling_flow_model}, we summarize the procedure how to sample from a flow model.
+
+\paragraph{流模型。} 我们现在可以通过ODE构造一个生成模型。记住我们的目标是将简单分布$\pinit$转换为复杂分布$\pdata$。因此，ODE的模拟是这种转换的自然选择。\themebf{流模型}由ODE描述
+\begin{align*}
+    X_0 &\sim \pinit  &&\blacktriangleright\,\,\text{随机初始化} \\
+    \frac{\dd}{\dd t}X_t &= u_t^\theta(X_t) &&\blacktriangleright\,\,\text{ODE}
+\end{align*}
+其中向量场$u_t^\theta$是一个带有参数$\theta$的神经网络$u_t^\theta$。现在，我们将$u_t^\theta$视为一个通用神经网络；即带有参数$\theta$的连续函数$u_t^\theta:\mathbb{R}^d\times [0,1]\to\mathbb{R}^d$。稍后，我们将讨论神经网络架构的特定选择。我们的目标是使轨迹的终点$X_1$具有分布$\pdata$，即
+\begin{align*}
+    X_1 \sim \pdata \quad \Leftrightarrow \quad \psi_1^\theta(X_0)\sim \pdata
+\end{align*}
+其中$\psi_t^\theta$描述由$u_t^\theta$诱导的流。但是请注意：尽管它被称为\themeit{流模型}，\textbf{神经网络参数化的是向量场，而不是流}。为了计算流，我们需要模拟ODE。在\cref{alg:sampling_flow_model}中，我们总结了如何从流模型采样的过程。
 
 \begin{algorithm}[h]
 \caption{Sampling from a Flow Model with Euler method}
