@@ -18,3 +18,6 @@
 *.bbl
 *.pdf
 *.mtc0
+
+# ignore personal notes
+*.md

@@ -1,4 +1,14 @@
 \documentclass[svgnames,dvipsnames]{article}
+
+% For XeLaTeX compilation with Chinese support
+\usepackage{ifxetex}
+\ifxetex
+  \usepackage{fontspec}
+  \usepackage{xeCJK}
+  \setCJKmainfont{SimSun}
+  \setCJKsansfont{SimHei}
+\fi
+
 \usepackage{notes}
 \usepackage{cleveref}
 \usepackage{subfiles}

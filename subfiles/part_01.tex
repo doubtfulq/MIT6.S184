@@ -2,14 +2,23 @@
 \label{sec:introduction}
 \epigraph{Creating noise from data is easy; creating data from noise is generative modeling.}{Song et al. \cite{yangsong_sde}}
 
+\epigraph{从数据中创造噪声很容易；从噪声中创造数据就是生成式建模。}{Song等人 \cite{yangsong_sde}}
+
 
 \subsection{Overview}
 In recent years, we all have witnessed a tremendous revolution in artificial intelligence (AI). 
 Image generators like \themeit{Stable Diffusion 3} can generate photorealistic and artistic images across a diverse range of styles, video models like Meta's \themeit{Movie Gen Video} can generate highly realistic movie clips, and large language models like \themeit{ChatGPT} can generate seemingly human-level responses to text prompts. At the heart of this revolution lies a new ability of AI systems: the ability to \themebf{generate} objects. While previous generations of AI systems were mainly used for \themebf{prediction}, these new AI system are creative: they dream or come up with new objects based on user-specified input. Such \themebf{generative AI} systems are at the core of this recent AI revolution.  
 
+近年来，我们都见证了人工智能（AI）领域的巨大革命。
+像\themeit{Stable Diffusion 3}这样的图像生成器可以生成各种风格的照片级真实和艺术图像，像Meta的\themeit{Movie Gen Video}这样的视频模型可以生成高度逼真的电影片段，而像\themeit{ChatGPT}这样的大型语言模型可以对文本提示生成看似人类水平的响应。这场革命的核心是AI系统的一种新能力：\themebf{生成}对象的能力。虽然前几代AI系统主要用于\themebf{预测}，但这些新的AI系统具有创造性：它们能够基于用户指定的输入梦想或创造出新的对象。这样的\themebf{生成式AI}系统正是这次AI革命的核心。
+
 The goal of this class is to teach you two of the most widely used generative AI algorithms: \themebf{denoising diffusion models} \citep{song2020score} and \themebf{flow matching} \citep{lipman2022flow,liu2022flow, albergo2023stochastic, lipman2024flow}. These models are the backbone of the best image, audio, and video generation models (e.g., \themeit{Stable Diffusion 3} and \themeit{Movie Gen Video}), and have most recently became the state-of-the-art in scientific applications such as protein structures (e.g., \themeit{AlphaFold3} is a diffusion model). Without a doubt, understanding these models is truly an extremely useful skill to have.
 
+本课程的目标是教授您两种最广泛使用的生成式AI算法：\themebf{去噪扩散模型} \citep{song2020score}和\themebf{流匹配} \citep{lipman2022flow,liu2022flow, albergo2023stochastic, lipman2024flow}。这些模型是最佳图像、音频和视频生成模型的支柱（例如，\themeit{Stable Diffusion 3}和\themeit{Movie Gen Video}），并且最近成为了科学应用中的最先进技术，如蛋白质结构（例如，\themeit{AlphaFold3}就是一个扩散模型）。毫无疑问，理解这些模型确实是一项极其有用的技能。
+
 All of these generative models generate objects by iteratively converting  \themebf{noise} into \themebf{data}. This evolution from noise to data is facilitated by the simulation of \themebf{ordinary or stochastic differential equations (ODEs/SDEs)}. Flow matching and denoising diffusion models are a family of techniques that allow us to construct, train, and simulate, such ODEs/SDEs at large scale with deep neural networks. While these models are rather simple to implement, the technical nature of SDEs can make these models difficult to understand. In this course, our goal is to provide a self-contained introduction to the necessary mathematical toolbox regarding differential equations to enable you to systematically understand these models. Beyond being widely applicable, we believe that the theory behind flow and diffusion models is elegant in its own right. Therefore, most importantly, we hope that this course will be a lot of fun to you. 
+
+所有这些生成式模型都通过迭代地将\themebf{噪声}转换为\themebf{数据}来生成对象。从噪声到数据的这种演化过程是通过模拟\themebf{常微分方程或随机微分方程（ODEs/SDEs）}来实现的。流匹配和去噪扩散模型是一系列技术，使我们能够使用深度神经网络大规模地构建、训练和模拟这样的ODEs/SDEs。虽然这些模型实现起来相当简单，但SDEs的技术性质可能使这些模型难以理解。在本课程中，我们的目标是提供关于微分方程的必要数学工具箱的自包含介绍，使您能够系统地理解这些模型。除了广泛适用之外，我们相信流模型和扩散模型背后的理论本身就很优雅。因此，最重要的是，我们希望这门课程对您来说会很有趣。 
 
 \begin{remarkbox}[Additional Resources] 
 While these lecture notes are self-contained, there are two additional resources that we encourage you to use:
@@ -18,6 +27,13 @@ While these lecture notes are self-contained, there are two additional resources
     \item \textbf{Labs:} These guide you in implementing your own diffusion model from scratch. We highly recommend that you ``get your hands dirty'' and code.
 \end{enumerate}
 You can find these on our course website: \url{https://diffusion.csail.mit.edu/}.
+
+虽然这些讲义是自包含的，但我们鼓励您使用两个额外的资源：
+\begin{enumerate}
+    \item \textbf{讲座录像：} 这些以讲座形式引导您了解每个部分。
+    \item \textbf{实验：} 这些指导您从零开始实现自己的扩散模型。我们强烈建议您"动手实践"并编程。
+\end{enumerate}
+您可以在我们的课程网站上找到这些资源：\url{https://diffusion.csail.mit.edu/}。
 \end{remarkbox}
 
 % \ee{Recent years have seen a revolution in the capability and ubiquity of artificial-intelligence-based (AI-based) approaches to generative tasks. Image models like \themeit{Stable Diffusion} can generate both photorealistic and artistic images across a diverse range of styles, while video models like \themeit{Sora} can generate highly realistic movie clips. Large language models like \themeit{ChatGPT} can generate seemingly human-level responses to text prompts, while models like \themeit{AlphFold3} can generate novel protein structures. At the heart of this revolution lies the ability to \themeit{generate} objects. As we shall see, such \themebf{generative} models are qualitatively different from their \themebf{discriminative} predecessors (e.g., those used for classification-based tasks), and constitute a rich and rapidly expanding algorithmic design space. 
@@ -27,46 +43,102 @@ You can find these on our course website: \url{https://diffusion.csail.mit.edu/}
 \subsection{Course Structure}
 
 We give a brief overview over of this document.
+
+我们对本文档进行简要概述。
+
 \begin{itemize}
 \item \textbf{\sffamily Section \ref{sec:introduction}, Generative Modeling as Sampling:} We formalize what it means to ``generate'' an image, video, protein, etc. We will translate the problem of e.g., ``how to generate an image of a dog?'' into the more precise problem of sampling from a probability distribution.
+
+\textbf{\sffamily 第\ref{sec:introduction}节，生成式建模即采样：} 我们形式化地定义了"生成"图像、视频、蛋白质等的含义。我们将诸如"如何生成一只狗的图像？"这样的问题转化为从概率分布中采样这一更精确的问题。
+
 \item \textbf{\sffamily Section \ref{sec:odes_sdes}, Flow and Diffusion Models:} Next, we explain the machinery of generation. As you can guess by the name of this class, this machinery consists of simulating ordinary and stochastic differential equations. We provide an introduction to differential equations and explain how to construct them with neural networks. 
+
+\textbf{\sffamily 第\ref{sec:odes_sdes}节，流模型和扩散模型：} 接下来，我们解释生成的机制。正如您从本课程的名称可以猜到的那样，这种机制包括模拟常微分方程和随机微分方程。我们提供微分方程的介绍，并解释如何用神经网络构造它们。
+
 \item \textbf{\sffamily Section \ref{sec:fokker_planck}, Constructing a Training Target:} To train our generative model, we must first pin down precisely what it is that our model is supposed to approximate. In other words, what's the ground truth? We will introduce the celebrated \themebf{Fokker-Planck equation}, which will allow us to formalize the notion of ground truth.
+
+\textbf{\sffamily 第\ref{sec:fokker_planck}节，构建训练目标：} 为了训练我们的生成模型，我们必须首先精确确定我们的模型应该近似什么。换句话说，什么是真实值？我们将介绍著名的\themebf{Fokker-Planck方程}，它将使我们能够形式化真实值的概念。
+
 \item \textbf{\sffamily Section \ref{sec:training_generative_models}, Training:} This section formulates a \themebf{training objective}, allowing us to approximate the training target, or ground truth, of the previous section. With this, we are ready to provide a minimal implementation of flow matching and denoising diffusion models.
+
+\textbf{\sffamily 第\ref{sec:training_generative_models}节，训练：} 本节制定了一个\themebf{训练目标}，使我们能够近似前一节的训练目标或真实值。有了这个，我们就准备好提供流匹配和去噪扩散模型的最小实现。
+
 \item \textbf{\sffamily Section \ref{sec:image_generation}, Conditional Image Generation:} We learn how to build a conditional image generator. To do so, we formulate how to condition our samples on a prompt (e.g. ``an image of a cat''). We then discuss common neural network architectures and survey state-of-the-art models for both image and video generation.
+
+\textbf{\sffamily 第\ref{sec:image_generation}节，条件图像生成：} 我们学习如何构建条件图像生成器。为此，我们制定如何在提示上条件化我们的样本（例如"一只猫的图像"）。然后我们讨论常见的神经网络架构，并调研图像和视频生成的最先进模型。
 \end{itemize}
 
 \paragraph{Required background.} Due to the technical nature of this subject, we recommend some base level of mathematical maturity, and in particular some familiarity with probability theory. For this reason, we included a brief reminder section on probability theory in \cref{appendix:prob_theory_reminder}. Don't worry if some of the concepts there are unfamiliar to you.
 
+\paragraph{所需背景。} 由于本主题的技术性质，我们建议具备一定程度的数学成熟度，特别是对概率论有一定的熟悉。因此，我们在\cref{appendix:prob_theory_reminder}中包含了概率论的简要提醒部分。如果其中的一些概念对您来说很陌生，请不要担心。
+
 \subsection{Generative Modeling As Sampling}
 \label{subsec:gm_as_sampling}
 Let's begin by thinking about various data types, or \themebf{modalities}, that we might encounter, and how we will go about representing them numerically:
+
+让我们首先思考我们可能遇到的各种数据类型或\themebf{模态}，以及我们将如何以数值方式表示它们：
+
 \begin{enumerate}
     \item \textbf{\sffamily Image: }Consider images with $H \times W$ pixels where $H$ describes the height and $W$ the width of the image, each with three color channels (RGB). For every pixel and every color channel, we are given an intensity value in $\mathbb{R}$. Therefore, an image can be represented by an element $\dap\in\mathbb{R}^{H \times W \times 3}$.
+    
+    \textbf{\sffamily 图像：} 考虑具有$H \times W$像素的图像，其中$H$描述图像的高度，$W$描述图像的宽度，每个像素都有三个颜色通道（RGB）。对于每个像素和每个颜色通道，我们得到一个在$\mathbb{R}$中的强度值。因此，图像可以用元素$\dap\in\mathbb{R}^{H \times W \times 3}$表示。
+    
     \item \textbf{\sffamily Video: }A video is simply a series of images in time. If we have $T$ time points or \themebf{frames}, a video would therefore be represented by an element $\dap\in\mathbb{R}^{T\times H \times W \times 3}$.
+    
+    \textbf{\sffamily 视频：} 视频只是时间上的一系列图像。如果我们有$T$个时间点或\themebf{帧}，那么视频将由元素$\dap\in\mathbb{R}^{T\times H \times W \times 3}$表示。
+    
     \item \textbf{\sffamily Molecular structure: }A naive way would be to represent the structure of a molecule by a matrix \\$z=(z^1,\dots,z^N)\in\mathbb{R}^{3\times N}$ where $N$ is the number of atoms in the molecule and each $z^i\in\mathbb{R}^3$ describes the location of that atom. Of course, there are other, more sophisticated ways of representing such a molecule.
+    
+    \textbf{\sffamily 分子结构：} 一种简单的方法是用矩阵$z=(z^1,\dots,z^N)\in\mathbb{R}^{3\times N}$来表示分子的结构，其中$N$是分子中原子的数量，每个$z^i\in\mathbb{R}^3$描述该原子的位置。当然，还有其他更复杂的方法来表示这样的分子。
 \end{enumerate}
 In all of the above examples, the object that we want to generate can be mathematically represented as a vector (potentially after flattening). Therefore, throughout this document, we will have:
+
+在上述所有例子中，我们想要生成的对象都可以数学地表示为向量（可能在展平后）。因此，在整个文档中，我们将有：
+
 \begin{ideabox}[Objects as Vectors]
     We identify the objects being generated as vectors $z \in \mathbb{R}^d$.
+    
+    我们将被生成的对象识别为向量$z \in \mathbb{R}^d$。
 \end{ideabox}
 A notable exception to the above is text data, which is typically modeled as a discrete object via autoregressive language models (such as \emph{ChatGPT}). While flow and diffusion models for discrete data have been developed, this course focuses exclusively on applications to continuous data.
 
+上述情况的一个值得注意的例外是文本数据，它通常通过自回归语言模型（如\emph{ChatGPT}）建模为离散对象。虽然针对离散数据的流模型和扩散模型已经被开发出来，但本课程专门关注连续数据的应用。
+
 
 \paragraph{Generation as Sampling.}Let us define what it means to ``generate'' something. For example, let's say we want to generate an image of a dog. Naturally, there are \emph{many} possible images of dogs that we would be happy with. In particular, there is no one single ``best'' image of a dog. Rather, there is a spectrum of images that fit better or worse. In machine learning, it is common to think of this diversity of possible images as a \emph{probability distribution}. We call it the \themebf{data distribution} and denote it as $\pdata$. In the example of dog images, this distribution would therefore give higher likelihood to images that look more like a dog. Therefore, how "good" an image/video/molecule fits - a rather subjective statement - is replaced by how "likely" it is under the data distribution $\pdata$. With this, we can mathematically express the task of generation as sampling from the (unknown) distribution $\pdata$:
+
+\paragraph{生成即采样。}让我们定义"生成"某物的含义。例如，假设我们想生成一只狗的图像。自然地，有\emph{许多}可能的狗的图像我们会满意。特别是，没有一个单一的"最佳"狗图像。相反，有一个图像谱系，有些更符合，有些不太符合。在机器学习中，通常将这种可能图像的多样性看作\emph{概率分布}。我们称其为\themebf{数据分布}，并将其表示为$\pdata$。在狗图像的例子中，该分布会对看起来更像狗的图像给出更高的似然性。因此，图像/视频/分子的"好坏"程度——一个相当主观的陈述——被替换为它在数据分布$\pdata$下的"似然性"。有了这个，我们可以数学地将生成任务表达为从（未知）分布$\pdata$中采样：
+
 \begin{ideabox}[Generation as Sampling]
     Generating an object $z$ is modeled as sampling from the data distribution $z\sim \pdata$.
+    
+    生成对象$z$被建模为从数据分布$z\sim \pdata$中采样。
 \end{ideabox}
 A \themebf{generative model} is a machine learning model that allows us to generate samples from $\pdata$. In machine learning, we require data to train models. In generative modeling, we usually assume access to a finite number of examples sampled independently from $\pdata$, which together serve as a proxy for the true distribution.
+
+\themebf{生成模型}是一个机器学习模型，它允许我们从$\pdata$中生成样本。在机器学习中，我们需要数据来训练模型。在生成式建模中，我们通常假设可以访问从$\pdata$中独立采样的有限数量的样本，这些样本一起作为真实分布的代理。
+
 \begin{ideabox}[Dataset]
     A dataset consists of a finite number of samples $z_1, \dots, z_N \sim \pdata$.
+    
+    数据集由有限数量的样本$z_1, \dots, z_N \sim \pdata$组成。
 \end{ideabox}
 For images, we might construct a dataset by compiling publicly available images from the internet. For videos, we might similarly use YouTube as a database. For protein structures, we can use experimental data bases from sources such as the Protein Data Bank (PDB) that collected scientific measurements over decades. As the size of our dataset grows very large, it becomes an increasingly better representation of the underlying distribution $\pdata$.
 
+对于图像，我们可能通过编译互联网上公开可用的图像来构建数据集。对于视频，我们可能类似地使用YouTube作为数据库。对于蛋白质结构，我们可以使用来自蛋白质数据库（PDB）等来源的实验数据库，该数据库收集了数十年的科学测量数据。随着我们数据集的规模变得非常大，它变成了对底层分布$\pdata$越来越好的表示。
+
 \paragraph{Conditional Generation.} In many cases, we want to generate an object \themebf{conditioned} on some data $y$. For example, we might want to generate an image conditioned on $y=$``a dog running down a hill covered with snow with mountains in the background''. We can rephrase this as sampling from a \themebf{conditional distribution}:
+
+\paragraph{条件生成。} 在许多情况下，我们想要生成一个\themebf{条件化}于某些数据$y$的对象。例如，我们可能想要生成一个条件化于$y=$"一只狗在覆盖着雪的山丘上奔跑，背景是山脉"的图像。我们可以将其重新表述为从\themebf{条件分布}中采样：
+
 \begin{ideabox}[Conditional Generation]
     Conditional generation involves sampling from $z\sim \pdata(\cdot | y)$, where $y$ is a conditioning variable.
+    
+    条件生成涉及从$z\sim \pdata(\cdot | y)$中采样，其中$y$是条件变量。
 \end{ideabox}
 We call $\pdata(\cdot|y)$ the \themebf{conditional data distribution}. The conditional generative modeling task typically involves learning to condition on an arbitrary, rather than fixed, choice of $y$. Using our previous example, we might alternatively want to condition on a different text prompt, such as $y=$``a photorealistic image of a cat blowing out birthday candles''. We therefore seek a single model which may be conditioned on any such choice of $y$. It turns out that techniques for unconditional generation are readily generalized to the conditional case. Therefore, for the first 3 sections, we will focus almost exclusively on the unconditional case (keeping in mind that conditional generation is what we're building towards).
+
+我们称$\pdata(\cdot|y)$为\themebf{条件数据分布}。条件生成建模任务通常涉及学习对任意而非固定的$y$选择进行条件化。使用我们之前的例子，我们可能想要条件化于不同的文本提示，比如$y=$"一只猫吹生日蜡烛的逼真图像"。因此，我们寻求一个可以条件化于任何这样的$y$选择的单一模型。事实证明，无条件生成的技术很容易推广到条件情况。因此，在前3节中，我们将几乎专门关注无条件情况（记住条件生成是我们正在构建的目标）。
 
 
 % \paragraph{Generative Models.} \ee{General note: this section makes a very large intuitive jump (with flow models) in just two sentences. The central point is therefore not ``generative modeling'' but specifically the idea of transforming samples from a simple Gaussian (a flow). I think the title should reflect this. See revised section below.} A \themebf{generative model} is a machine learning model that allows us to generate samples from $\pdata$. For this, we assume that we have access to some simple distribution $\pinit$ that we can easily sample from, e.g. $\pinit=\mathcal{N}(0,I_d)$ could be a Gaussian distribution. The goal of a generative model is then to transform samples from $X\sim \pinit$ into samples from $\pdata$. We note that $\pinit$ does not have to be simple or Gaussian at all. In fact, there are interesting usecases for leveraging this flexibility (see \ph{reference to where this is discussed}). We just call it $\pinit$ because in the majority of applications we think of it as a simple Gaussian.
@@ -74,12 +146,25 @@ We call $\pdata(\cdot|y)$ the \themebf{conditional data distribution}. The condi
 % \ee{Revise previous section: 
 \paragraph{From Noise to Data.} So far, we have discussed the \themeit{what} of generative modeling: generating samples from $\pdata$. Here, we will briefly discuss the \themeit{how}. For this, we assume that we have access to some \themebf{initial distribution} $\pinit$ that we can easily sample from, such as the Gaussian $\pinit=\mathcal{N}(0,I_d)$. The goal of generative modeling is then to transform samples from $x\sim \pinit$ into samples from $\pdata$. We note that $\pinit$ does not have to be so simple as a Gaussian. As we shall see, there are interesting use cases for leveraging this flexibility. Despite this, in the majority of applications we take it to be a simple Gaussian and it is important to keep that in mind.
 
+\paragraph{从噪声到数据。} 到目前为止，我们已经讨论了生成式建模的\themeit{内容}：从$\pdata$中生成样本。在这里，我们将简要讨论\themeit{方法}。为此，我们假设我们可以访问某个\themebf{初始分布}$\pinit$，我们可以轻松地从中采样，比如高斯分布$\pinit=\mathcal{N}(0,I_d)$。然后，生成式建模的目标是将从$x\sim \pinit$的样本转换为从$\pdata$的样本。我们注意到$\pinit$不必像高斯分布那样简单。正如我们将看到的，利用这种灵活性有有趣的用例。尽管如此，在大多数应用中，我们将其视为简单的高斯分布，记住这一点很重要。
+
 \paragraph{Summary} We summarize our discussion so far as follows.\label{par:summary}
+
+\paragraph{总结} 我们总结到目前为止的讨论如下。
+
 \begin{summarybox}[Generation as Sampling] We summarize the findings of this section:
 \begin{enumerate}
 \item In this class, we consider the task of generating objects that are represented as vectors $z\in\mathbb{R}^d$ such as images, videos, or molecular structures.
 \item Generation is the task of generating samples from a probability distribution $\pdata$ having access to a dataset of samples $z_1,\dots,z_N\sim \pdata$ during training. 
 \item Conditional generation assumes that we condition the distribution on a label $y$ and we want to sample from $\pdata(\cdot|y)$ having access to data set of pairs $(z_1,y)\dots,(z_N,y)$ during training.
 \item Our goal is to train a generative model to transform samples from a simple distribution $\pinit$ (e.g. a Gaussian) into samples from $\pdata$.
+\end{enumerate}
+
+我们总结本节的发现：
+\begin{enumerate}
+\item 在本课程中，我们考虑生成表示为向量$z\in\mathbb{R}^d$的对象的任务，如图像、视频或分子结构。
+\item 生成是从概率分布$\pdata$中生成样本的任务，在训练期间可以访问样本数据集$z_1,\dots,z_N\sim \pdata$。
+\item 条件生成假设我们在标签$y$上条件化分布，并且我们想要从$\pdata(\cdot|y)$中采样，在训练期间可以访问对$(z_1,y)\dots,(z_N,y)$的数据集。
+\item 我们的目标是训练生成模型，将来自简单分布$\pinit$（例如高斯分布）的样本转换为来自$\pdata$的样本。
 \end{enumerate}
 \end{summarybox}
