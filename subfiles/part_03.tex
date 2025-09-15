@@ -1,6 +1,5 @@
 \section{Constructing the Training Target}
 
-\section{构建训练目标}
 \label{sec:fokker_planck}
 
 In the previous section, we constructed flow and diffusion models where we obtain trajectories $(X_t)_{0\leq t\leq 1}$ by simulating the ODE/SDE
@@ -37,8 +36,6 @@ There are a number of different approaches to deriving a training target for flo
 \end{figure}
 
 \subsection{Conditional and Marginal Probability Path}
-
-\subsection{条件概率路径和边际概率路径}
 
 The first step of constructing the training target $\uref_t$ is by specifying a \themebf{probability path}. Intuitively, a probability path specifies a gradual interpolation between noise $\pinit$ and data $\pdata$ (see \cref{fig:noising_image}). We explain the construction in this section. In the following, for a data point $z\in\mathbb{R}^d$, we denote with $\delta_{z}$ the \themebf{Dirac delta} ``distribution''. This is the simplest distribution that one can imagine: sampling from $\delta_{z}$ always returns $z$ (i.e. it is deterministic). A \themebf{conditional (interpolating) probability path} is a set of distribution $p_t(x|z)$ over $\mathbb{R}^d$ such that:
 
@@ -177,8 +174,6 @@ Intuitively, the above procedure adds more noise for lower $t$ until time $t=0$,
 
 
 \subsection{Conditional and Marginal Vector Fields}
-
-\subsection{条件向量场和边际向量场}
 
 We proceed now by constructing a training target $\uref_t$ for a flow model using the recently defined notion of a probability path $p_t$. The idea is to construct $\uref_t$ from simple components that we can derive analytically by hand.
 
@@ -331,8 +326,6 @@ where in $(i)$ we used the definition of $p_t(x)$ in \cref{eq:marginal_prob_path
 \end{figure}
 
 \subsection{Conditional and Marginal Score Functions}
-
-\subsection{条件得分函数和边际得分函数}
 
 We just successfully constructed a training target for a flow model. We now extend this reasoning to SDEs. To do so, let us define the \themebf{marginal score function} of $p_t$ as $\nabla\log p_t(x)$. We can use this to extend the ODE from the previous section to an SDE, as the following result demonstrates.
 
