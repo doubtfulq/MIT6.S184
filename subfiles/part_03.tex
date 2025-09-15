@@ -1,20 +1,30 @@
 \section{Constructing the Training Target}
+
+\section{构建训练目标}
 \label{sec:fokker_planck}
 
 In the previous section, we constructed flow and diffusion models where we obtain trajectories $(X_t)_{0\leq t\leq 1}$ by simulating the ODE/SDE
+
+在前一节中，我们构建了流模型和扩散模型，通过模拟常微分方程/随机微分方程来获得轨迹 $(X_t)_{0\leq t\leq 1}$
 \begin{align}
 \label{e:sde_generative_model_restated_section_3}
  X_0\sim&\pinit,\quad \dd X_t = u_t^\theta(X_t)\dd t& \text{(Flow model)}\\
  X_0\sim&\pinit,\quad \dd X_t = u_t^\theta(X_t)\dd t + \sigma_t\dd W_t& \text{(Diffusion model)}
 \end{align}
 where $u_t^\theta$ is a neural network and $\sigma_t$ is a fixed diffusion coefficient. Naturally, if we just randomly initialize the parameters $\theta$ of our neural network $u_t^\theta$, simulating the ODE/SDE will just produce nonsense. As always in machine learning, we need to train the neural network. We accomplish this by minimizing a loss function $\mathcal{L}(\theta)$, such as the \themebf{mean-squared error}
+
+其中 $u_t^\theta$ 是一个神经网络，$\sigma_t$ 是固定的扩散系数。显然，如果我们只是随机初始化神经网络 $u_t^\theta$ 的参数 $\theta$，模拟 ODE/SDE 只会产生无意义的结果。正如机器学习中的惯例，我们需要训练神经网络。我们通过最小化损失函数 $\mathcal{L}(\theta)$ 来实现这一点，比如 \themebf{均方误差}
 \begin{align*}
     \mathcal{L}(\theta) = \lVert u_t^\theta(x)-\underbrace{\uref_t(x)}_{\text{training target}}\rVert^2 ,
 \end{align*}
 where $\uref_t(x)$ is the \themebf{training target} that we would like to approximate. To derive a training algorithm, we proceed in two steps: In this chapter, our goal is to \textbf{find an equation for the training target $\uref_t$}. In the next chapter, we will describe a training algorithm that approximates the training target $\uref_t$. Naturally, like the neural network $u_t^\theta$, the training target should itself be a vector field $\uref_t:\mathbb{R}^d\times[0,1]\to\mathbb{R}^d$. Further, $\uref_t$ should do what we want $u_t^\theta$ to do: convert noise into data. \textbf{Therefore, the goal of this chapter is to derive a formula for the training target $u_t^\text{ref}$ such that the corresponding ODE/SDE converts $\pinit$ into $\pdata$}. Along the way we will encounter two fundamental results from physics and stochastic calculus: the \themebf{continuity equation} and the \themebf{Fokker-Planck equation}. As before, we will first describe the key ideas for ODEs before generalizing them to SDEs.
 
+其中 $\uref_t(x)$ 是我们希望逼近的 \themebf{训练目标}。为了推导训练算法，我们分两步进行：在本章中，我们的目标是 \textbf{找到训练目标 $\uref_t$ 的方程}。在下一章中，我们将描述一个逼近训练目标 $\uref_t$ 的训练算法。显然，与神经网络 $u_t^\theta$ 一样，训练目标本身应该是一个向量场 $\uref_t:\mathbb{R}^d\times[0,1]\to\mathbb{R}^d$。此外，$\uref_t$ 应该完成我们希望 $u_t^\theta$ 完成的任务：将噪声转换为数据。\textbf{因此，本章的目标是推导训练目标 $u_t^\text{ref}$ 的公式，使得相应的 ODE/SDE 将 $\pinit$ 转换为 $\pdata$}。在此过程中，我们将遇到物理学和随机演算中的两个基本结果：\themebf{连续性方程} 和 \themebf{福克-普朗克方程}。如前所述，我们将首先描述 ODE 的关键思想，然后将其推广到 SDE。
+
 \begin{remarkbox}
 There are a number of different approaches to deriving a training target for flow and diffusion models. The approach we present here is both the most general and arguably most simple and is in line with recent state-of-the-art models. However, it might well differ from other, older presentations of diffusion models you have seen. Later, we will discuss  alternative formulations.
+
+对于流模型和扩散模型的训练目标，存在多种不同的推导方法。我们在此介绍的方法既是最通用的，也可以说是最简单的，并且与最近的最先进模型保持一致。然而，它可能与您之前见过的其他较早的扩散模型表述有所不同。稍后，我们将讨论其他的公式化方法。
 % \cref{subsec:guide_to_flow_matching_literature}.
 \end{remarkbox}
 
@@ -28,19 +38,27 @@ There are a number of different approaches to deriving a training target for flo
 
 \subsection{Conditional and Marginal Probability Path}
 
+\subsection{条件概率路径和边际概率路径}
+
 The first step of constructing the training target $\uref_t$ is by specifying a \themebf{probability path}. Intuitively, a probability path specifies a gradual interpolation between noise $\pinit$ and data $\pdata$ (see \cref{fig:noising_image}). We explain the construction in this section. In the following, for a data point $z\in\mathbb{R}^d$, we denote with $\delta_{z}$ the \themebf{Dirac delta} ``distribution''. This is the simplest distribution that one can imagine: sampling from $\delta_{z}$ always returns $z$ (i.e. it is deterministic). A \themebf{conditional (interpolating) probability path} is a set of distribution $p_t(x|z)$ over $\mathbb{R}^d$ such that:
+
+构建训练目标 $\uref_t$ 的第一步是指定一个 \themebf{概率路径}。直观地说，概率路径指定了噪声 $\pinit$ 和数据 $\pdata$ 之间的渐进插值（见\cref{fig:noising_image}）。我们在本节中解释这种构建方法。在下文中，对于数据点 $z\in\mathbb{R}^d$，我们用 $\delta_{z}$ 表示 \themebf{狄拉克delta} "分布"。这是人们可以想象的最简单的分布：从 $\delta_{z}$ 采样总是返回 $z$（即它是确定性的）。\themebf{条件（插值）概率路径} 是在 $\mathbb{R}^d$ 上的一组分布 $p_t(x|z)$，满足：
 \begin{align}
     % p_t(\cdot|z) \text{ distribution over }\R^d \quad (0\leq t\leq 1)\\
 \label{eq:interpolating_condition_conditional_path}
     p_0(\cdot|z)=\pinit, \quad p_1(\cdot|z)=\delta_{z}\quad \text{ for all }z\in\R^d.
 \end{align}
 In other words, a conditional probability path gradually converts a \themeit{single} data point into the distribution $\pinit$ (see e.g. \cref{fig:noising_image}). You can think of a probability path as a trajectory in the space of distributions. Every conditional probability path $p_t(x|z)$ induces a \themebf{marginal probability path} $p_t(x)$ defined as the distribution that we obtain by first sampling a data point $z\sim \pdata$ from the data distribution and then sampling from $p_t(\cdot|z)$:
+
+换句话说，条件概率路径逐渐将 \themeit{单个} 数据点转换为分布 $\pinit$（例如见\cref{fig:noising_image}）。您可以将概率路径视为分布空间中的轨迹。每个条件概率路径 $p_t(x|z)$ 诱导一个 \themebf{边际概率路径} $p_t(x)$，定义为我们首先从数据分布中采样数据点 $z\sim \pdata$，然后从 $p_t(\cdot|z)$ 中采样所得到的分布：
 \begin{align}
     \label{eq:marginal_prob_path}
     z&\sim\pdata, \quad x\sim p_t(\cdot|z)\quad \Rightarrow x\sim p_t &&\blacktriangleright\,\,\text{sampling from marginal path}\\
     p_t(x) &= \int p_t(x|\dap) \pdata (z) \dd z &&\blacktriangleright\,\,\text{density of marginal path}
 \end{align}
 Note that we know how to sample from $p_t$ but we don't know the density values $p_t(x)$ as the integral is intractable. Check for yourself that because of the conditions on $p_t(\cdot|z)$ in \cref{eq:interpolating_condition_conditional_path}, the marginal probability path $p_t$ interpolates between $\pinit$ and $\pdata$:
+
+注意，我们知道如何从 $p_t$ 中采样，但由于积分是不可处理的，我们不知道密度值 $p_t(x)$。您可以自己验证，由于 \cref{eq:interpolating_condition_conditional_path} 中对 $p_t(\cdot|z)$ 的条件，边际概率路径 $p_t$ 在 $\pinit$ 和 $\pdata$ 之间插值：
 \begin{align}
 \label{eq:noise_interpolation}
 p_0 =\pinit\quad\text{and}\quad p_1=\pdata.\quad\quad\quad\quad \blacktriangleright\,\,\text{noise-data interpolation}
@@ -77,22 +95,30 @@ p_0 =\pinit\quad\text{and}\quad p_1=\pdata.\quad\quad\quad\quad \blacktriangleri
 \begin{examplebox}[Gaussian Conditional Probability Path]
 \label{example:gaussian_path}
     One particularly popular probability path is the \themebf{Gaussian probability path}. This is the \textbf{probability path used by denoising diffusion models}. Let $\alpha_t,\beta_t$ be \themebf{noise schedulers}: two continuously differentiable, monotonic functions with $\alpha_0=\beta_1=0$ and $\alpha_1=\beta_0=1$. We then define the conditional probability path
+
+    一个特别流行的概率路径是 \themebf{高斯概率路径}。这是 \textbf{去噪扩散模型使用的概率路径}。设 $\alpha_t,\beta_t$ 为 \themebf{噪声调度器}：两个连续可微的单调函数，满足 $\alpha_0=\beta_1=0$ 和 $\alpha_1=\beta_0=1$。然后我们定义条件概率路径
 \begin{align}
 \label{eq:gaussian_conditional_probability_paths}
 p_t(\cdot|\dap) &= \mathcal{N}(\alpha_t \dap,\beta_t^2 I_d)
 & \blacktriangleright \,\, \text{Gaussian conditional path}
 \end{align}
 which, by the conditions we imposed on $\alpha_t$ and $\beta_t$, fulfills
+
+根据我们对 $\alpha_t$ 和 $\beta_t$ 施加的条件，这满足
 \begin{align*}
     p_0(\cdot|\dap) &= \mathcal{N}(\alpha_0 \dap,\beta_0^2 I_d) = \mathcal{N}(0,I_d),\quad \text{and}\quad
 p_1(\cdot|\dap) = \mathcal{N}(\alpha_1 \dap,\beta_1^2 I_d) = \delta_{\dap},
 \end{align*}
-where we have used the fact that a normal distribution with zero variance and mean $\dap$ is just $\delta_{\dap}$. Therefore, this choice of $p_t(x|\dap)$ fulfills \cref{eq:interpolating_condition_conditional_path} for $\pinit=\mathcal{N}(0,I_d)$ and is therefore a valid conditional interpolating path. The Gaussian conditional probability path has several useful properties which makes it especially amenable to our goals, and because of this we will use it as our prototypical example of a conditional probability path for the rest of the section. In \cref{fig:noising_image}, we illustrate its application to an image. We can express sampling from the marginal path $p_t$ as: 
+where we have used the fact that a normal distribution with zero variance and mean $\dap$ is just $\delta_{\dap}$. Therefore, this choice of $p_t(x|\dap)$ fulfills \cref{eq:interpolating_condition_conditional_path} for $\pinit=\mathcal{N}(0,I_d)$ and is therefore a valid conditional interpolating path. The Gaussian conditional probability path has several useful properties which makes it especially amenable to our goals, and because of this we will use it as our prototypical example of a conditional probability path for the rest of the section. In \cref{fig:noising_image}, we illustrate its application to an image. We can express sampling from the marginal path $p_t$ as:
+
+其中我们利用了方差为零、均值为 $\dap$ 的正态分布就是 $\delta_{\dap}$ 这一事实。因此，对于 $\pinit=\mathcal{N}(0,I_d)$，这种 $p_t(x|\dap)$ 的选择满足 \cref{eq:interpolating_condition_conditional_path}，因此是一个有效的条件插值路径。高斯条件概率路径具有几个有用的性质，使其特别适合我们的目标，因此我们将在本节的其余部分使用它作为条件概率路径的原型示例。在 \cref{fig:noising_image} 中，我们展示了它在图像上的应用。我们可以将从边际路径 $p_t$ 采样表示为： 
 \begin{align}
     \label{eq:gaussian_prob_path_sampling}
     z\sim&\pdata,\,\epsilon\sim\pinit = \mathcal{N}(0,I_d) \,\Rightarrow\, x=\alpha_tz+\beta_t \epsilon\sim p_t \quad &\blacktriangleright \,\,\text{sampling from marginal Gaussian path}
 \end{align}
 Intuitively, the above procedure adds more noise for lower $t$ until time $t=0$, at which point there is only noise. In \cref{fig:cond_marginal_path_histograms}, we plot an example of such an interpolating path between Gaussian noise and a simple data distribution.
+
+直观地说，上述过程为较小的 $t$ 添加更多噪声，直到时间 $t=0$，此时只有噪声。在 \cref{fig:cond_marginal_path_histograms} 中，我们绘制了高斯噪声和简单数据分布之间这种插值路径的一个示例。
 \end{examplebox}
 
 % \paragraph{Marginal probability path.}
