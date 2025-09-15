@@ -3,16 +3,27 @@
 
 In the previous sections, we learned how to train a flow matching or diffusion model to sample from a distribution $\pdata(x)$. This recipe is general and can be applied to a variety of different data types and applications. In this section, we learn how to apply this framework to build an image or video generator, such as e.g., \themeit{Stable Diffusion 3} and \themeit{Meta Movie Gen Video}. To build such a model, there are two main ingredients that we are missing: First, we will need to formulate \themebf{conditional generation} (\themebf{guidance}), e.g. how do we generate an image that fits a specific text prompt, and how our existing objectives may be suitably adapted to this end. We will also learn about classifier-free guidance, a popular technique used to enhance the quality of conditional generation. Second, we will discuss common neural network architectures, again focusing on those designed for images and videos. Finally, we will examine in depth the two state-of-the-art image and video models mentioned above - \themeit{Stable Diffusion} and \themeit{Meta MovieGen} - to give you a taste of how things are done at scale.
 
+在前面的章节中，我们学习了如何训练流匹配或扩散模型来从分布$\pdata(x)$中采样。这个方法是通用的，可以应用于各种不同的数据类型和应用。在本节中，我们学习如何应用这个框架来构建图像或视频生成器，例如\themeit{Stable Diffusion 3}和\themeit{Meta Movie Gen Video}。要构建这样的模型，我们缺少两个主要组成部分：首先，我们需要制定\themebf{条件生成}（\themebf{指导}），例如如何生成符合特定文本提示的图像，以及如何适当调整我们现有的目标函数来实现这一目标。我们还将学习无分类器指导，这是一种用于提高条件生成质量的流行技术。其次，我们将讨论常用的神经网络架构，重点关注那些为图像和视频设计的架构。最后，我们将深入研究上述两个最先进的图像和视频模型——\themeit{Stable Diffusion}和\themeit{Meta MovieGen}——让您体验大规模实现的方式。
+
 \subsection{Guidance}
 
 So far, the generative models we considered were \themebf{unconditional}, e.g. an image model would simply generate \themeit{some} image. However, the task is not merely to generate an arbitrary object, but to generate an object \textbf{\sffamily conditioned on some additional information}. For example, one might imagine a generative model for images which takes in a text prompt $y$, and then generates an image $x$ \textbf{\sffamily conditioned} on $y$. For fixed prompt $y$, we would thus like to sample from $\pdata(x|y)$, that is, the data distribution \textbf{\sffamily conditioned on $y$}. Formally, we think of $y$ to live in a space $\mathcal{Y}$. When $y$ corresponds to a text-prompt, for example, $\mathcal{Y}$ would likely be some continuous space like $\mathbb{R}^{d_y}$. When $y$ corresponds to some discrete class label, $\mathcal{Y}$ would be discrete. In the lab, we will work with the MNIST dataset, in which case we will take $\mathcal{Y} = \{0,1,\dots,9\}$ to correspond to the identities of handwritten digits.\\
 
+到目前为止，我们考虑的生成模型都是\themebf{无条件的}，例如图像模型只是简单地生成\themeit{某些}图像。然而，任务不仅仅是生成任意对象，而是生成\textbf{\sffamily 基于某些额外信息条件}的对象。例如，人们可以想象一个图像生成模型，它接受文本提示$y$，然后生成\textbf{\sffamily 基于}$y$\textbf{\sffamily 条件}的图像$x$。对于固定的提示$y$，我们希望从$\pdata(x|y)$中采样，即\textbf{\sffamily 基于$y$条件}的数据分布。形式上，我们认为$y$存在于空间$\mathcal{Y}$中。例如，当$y$对应于文本提示时，$\mathcal{Y}$可能是某个连续空间，如$\mathbb{R}^{d_y}$。当$y$对应于某个离散类别标签时，$\mathcal{Y}$将是离散的。在实验中，我们将使用MNIST数据集，在这种情况下，我们取$\mathcal{Y} = \{0,1,\dots,9\}$对应于手写数字的身份。\\
+
 To avoid a notation and terminology clash with the use of the word "\text{conditional}" to refer to conditioning on $z \sim \pdata$ (conditional probability path/vector field), we will make use of the term \themebf{guided} to refer specifically to conditioning on $y$.
+
+为了避免使用词汇"\text{conditional}"来指代基于$z \sim \pdata$的条件化（条件概率路径/向量场）时产生的符号和术语冲突，我们将使用术语\themebf{guided}来专门指代基于$y$的条件化。
 \begin{remarkbox}[Guided vs. Conditional Terminology]
     In these notes, we opt to use the term \themebf{guided} in place of \themebf{conditional} to refer to the act of conditioning on $y$. Here, we will refer to e.g., a \themebf{guided} vector field $\uref_t(x|y)$ and a \themebf{conditional} vector field $\uref_t(x|z)$. This terminology is consistent with other works such as \cite{lipman2024flow}. 
 \end{remarkbox}
+\begin{remarkbox}[引导 vs. 条件 术语]
+    在这些笔记中，我们选择使用术语\themebf{guided}（引导）来代替\themebf{conditional}（条件）来指代基于$y$的条件化行为。在这里，我们将引用，例如，一个\themebf{guided}（引导）向量场$\uref_t(x|y)$和一个\themebf{conditional}（条件）向量场$\uref_t(x|z)$。这种术语与其他工作一致，如\cite{lipman2024flow}。
+\end{remarkbox}
 
 The goal of \themebf{guided generative modeling} is thus to be able to sample from $\pdata(x|y)$ \themeit{for any such $y$}. In the language of flow and score matching, and in which our generative models correspond to the simulation of ordinary and stochastic differential equations, this can be phrased as follows.
+
+因此，\themebf{引导生成建模}的目标是能够从$\pdata(x|y)$中采样，\themeit{对于任何这样的$y$}。在流匹配和评分匹配的语言中，我们的生成模型对应于常微分方程和随机微分方程的仿真，这可以表述如下。
 
 \begin{ideabox}[Guided Generative Model]
 We define a \themebf{guided diffusion model} to consist of a \themebf{guided vector field} $u_t^{\theta}(\cdot | y)$, parameterized by some neural network, and a time-dependent diffusion coefficient $\sigma_t$, together given by
@@ -27,6 +38,21 @@ Notice the difference from summary \ref{summary:diffusion_model}: we are additio
     \textbf{\sffamily Goal:}\quad X_1 &\sim  \pdata(\cdot | y) \quad &&\blacktriangleright\,\,\text{Goal is for $X_1$ to be distributed like $\pdata(\cdot|y)$.}
 \end{align*}
 When $\sigma_t = 0$, we say that such a model is a \themebf{guided flow model}.
+\end{ideabox}
+
+\begin{ideabox}[引导生成模型]
+我们定义一个\themebf{引导扩散模型}由一个\themebf{引导向量场}$u_t^{\theta}(\cdot | y)$（由某个神经网络参数化）和一个时间相关的扩散系数$\sigma_t$组成，它们一起给出：
+\begin{align*}
+    \textbf{\sffamily 神经网络:}&\, u^\theta: \mathbb{R}^d \times \mathcal{Y} \times [0,1] \to \mathbb{R}^d,\,\, (x,y,t) \mapsto u_t^{\theta}(x|y)\\
+    \textbf{\sffamily 固定:}&\, \sigma_t: [0,1] \to [0,\infty),\,\, t \mapsto \sigma_t
+\end{align*}
+注意与摘要\ref{summary:diffusion_model}的区别：我们另外用输入$y\in \mathcal{Y}$来引导$u_t^\theta$。对于任何这样的$y \in \mathbb{R}^{d_y}$，样本可以从这样的模型中生成，如下所示：
+\begin{align*}
+    \textbf{\sffamily 初始化:}\quad X_0&\sim\pinit \quad  &&\blacktriangleright\,\,\text{用简单分布（如高斯分布）初始化}\\
+    \textbf{\sffamily 仿真:}\quad \dd X_t &= u_t^\theta(X_t|y)\dd t + \sigma_t\dd W_t\quad &&\blacktriangleright\,\,\text{从$t=0$到$t=1$仿真SDE。}\\
+    \textbf{\sffamily 目标:}\quad X_1 &\sim  \pdata(\cdot | y) \quad &&\blacktriangleright\,\,\text{目标是使$X_1$分布如$\pdata(\cdot|y)$。}
+\end{align*}
+当$\sigma_t = 0$时，我们称这样的模型为\themebf{引导流模型}。
 \end{ideabox}
 
 \subsubsection{Guidance for Flow Models}
