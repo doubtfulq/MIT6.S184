@@ -36,6 +36,7 @@ u:\mathbb{R}^d\times [0,1]\to \R^d,\quad (x,t)\mapsto u_t(x),
 \Cref{e:ode_ode} requires that the derivative of $X_t$ is specified by the direction given by $u_t$. \Cref{e:ODE_boundary} requires that we start at $x_0$ at time $t=0$. We may now ask: if we start at $X_0 = x_0$ at $t=0$, where are we at time $t$ (what is $X_t$)? This question is answered by a function called the \themebf{flow}, which is a solution to the ODE
 
 \Cref{e:ode_ode}要求$X_t$的导数由$u_t$给出的方向指定。\Cref{e:ODE_boundary}要求我们在时间$t=0$时从$x_0$开始。我们现在可以问：如果我们在$t=0$时从$X_0 = x_0$开始，那么在时间$t$时我们在哪里（$X_t$是什么）？这个问题由一个称为\themebf{流}的函数回答，它是ODE的解
+
 \begin{subequations}\label{e:flow}
     \begin{align}
     \psi:\R^d\times [0,1]\mapsto& \R^d,\quad (x_0,t)\mapsto \psi_t(x_0)\\
@@ -52,6 +53,8 @@ For a given initial condition $X_0=x_0$, a trajectory of the ODE is recovered vi
 If $u:\R^d\times[0,1]\to\R^d$ is continuously differentiable with a bounded derivative, then the ODE in \eqref{e:flow} has a unique solution given by a flow $\psi_t$. In this case, $\psi_t$ is a \themebf{diffeomorphism} for all $t$, i.e. $\psi_t$ is continuously differentiable with a continuously differentiable inverse $\psi_t^{-1}$.
 \end{theorem}
 Note that the assumptions required for the existence and uniqueness of a flow are almost always fulfilled in machine learning, as we use neural networks to parameterize $u_t(x)$ and they always have bounded derivatives. Therefore, \cref{thm:ode_existence_and_uniqueness} should not be a concern for you but rather good news: \textbf{flows exist and are unique solutions to ODEs in our cases of interest.} A proof can be found in \citep{perko2013differential,coddington1956theory}.
+
+如果$u:\R^d\times[0,1]\to\R^d$是连续可微的且具有有界导数，那么\eqref{e:flow}中的ODE有由流$\psi_t$给出的唯一解。在这种情况下，$\psi_t$对于所有$t$都是\themebf{微分同胚}，即$\psi_t$是连续可微的，且具有连续可微的逆$\psi_t^{-1}$。
 
 注意，在机器学习中，流的存在性和唯一性所需的假设几乎总是满足的，因为我们使用神经网络来参数化$u_t(x)$，而它们总是具有有界导数。因此，\cref{thm:ode_existence_and_uniqueness}不应该是您担心的问题，而应该是好消息：\textbf{在我们感兴趣的情况下，流存在且是ODEs的唯一解。}证明可以在\citep{perko2013differential,coddington1956theory}中找到。
 
@@ -178,6 +181,13 @@ Stochastic differential equations (SDEs) extend the deterministic trajectories f
 \end{align*}
 In particular, when we simulate the same stochastic process twice, we might get different outcomes because the dynamics are designed to be random.
 
+随机微分方程（SDEs）通过\themebf{随机}轨迹扩展了ODEs的确定性轨迹。随机轨迹通常称为\themebf{随机过程}$(X_t)_{0\leq t\leq 1}$，定义为
+\begin{align*}
+    X_t \text{ 对于每个 } 0\leq t\leq 1\text{ 都是一个随机变量}\\
+    X: [0,1] \to \R^d, \quad t \mapsto X_t\text{ 对于}X\text{的每次抽取都是一个随机轨迹}
+\end{align*}
+特别地，当我们两次模拟同一个随机过程时，我们可能会得到不同的结果，因为动力学被设计为随机的。
+
 \paragraph{Brownian Motion.} SDEs are constructed via a \themebf{Brownian motion} - a fundamental stochastic process that came out of the study physical diffusion processes. You can think of a Brownian motion as a continuous random walk.
 \begin{wrapfigure}{r}{0.4\textwidth}
   %\begin{center}
@@ -200,6 +210,20 @@ Brownian motion is also called a \themebf{Wiener process}, which is why we denot
     W_{t+h} =& W_{t} + \sqrt{h}\epsilon_t,\quad \epsilon_t\sim\mathcal{N}(0,I_d)\quad (t=0,h,2h,\dots,1-h)
 \end{align}
 In \cref{fig:brownian_motion_trajectories}, we plot a few example trajectories of a Brownian motion.  Brownian motion is as central to the study of stochastic processes as the Gaussian distribution is to the study of probability distributions. From finance to statistical physics to epidemiology, the study of Brownian motion has far reaching applications beyond  machine learning. In finance, for example, Brownian motion is used to model the price of complex financial instruments. Also just as a mathematical construction, Brownian motion is fascinating: For example, while the paths of a Brownian motion are continuous (so that you could draw it without ever lifting a pen), they are infinitely long (so that you would never stop drawing).
+
+\paragraph{布朗运动。} SDEs通过\themebf{布朗运动}构造——这是一个源于物理扩散过程研究的基础随机过程。您可以将布朗运动视为连续随机游走。
+
+让我们定义它：\themebf{布朗运动}$W = (W_t)_{0\leq t\leq 1}$是一个随机过程，满足$W_0=0$，轨迹$t\mapsto W_t$是连续的，并且满足以下两个条件：
+\begin{enumerate}
+    \item \textbf{正态增量：}对于所有$0\leq s<t$，有$W_{t}-W_{s}\sim \mathcal{N}(0,(t-s)I_d)$，即增量具有方差随时间线性增加的高斯分布（$I_d$是单位矩阵）。
+    \item \textbf{独立增量：}对于任意$0\leq t_0<t_1<\dots <t_n=1$，增量$W_{t_1}-W_{t_0},\dots,W_{t_n}-W_{t_{n-1}}$是独立随机变量。
+\end{enumerate}
+
+布朗运动也称为\themebf{维纳过程}，这就是我们用"$W$"表示它的原因。\footnote{诺伯特·维纳是在MIT任教的著名数学家。您仍然可以在MIT数学系看到他的肖像。}我们可以通过设置$W_0=0$并更新来轻松地以步长$h>0$近似模拟布朗运动
+\begin{align}
+    W_{t+h} =& W_{t} + \sqrt{h}\epsilon_t,\quad \epsilon_t\sim\mathcal{N}(0,I_d)\quad (t=0,h,2h,\dots,1-h)
+\end{align}
+在\cref{fig:brownian_motion_trajectories}中，我们绘制了布朗运动的几个示例轨迹。布朗运动在随机过程研究中的核心地位，就像高斯分布在概率分布研究中的地位一样。从金融到统计物理再到流行病学，布朗运动的研究在机器学习之外有着深远的应用。例如，在金融领域，布朗运动用于建模复杂金融工具的价格。作为数学构造，布朗运动也很有趣：例如，虽然布朗运动的路径是连续的（因此您可以在不抬笔的情况下绘制它），但它们是无穷长的（因此您永远不会停止绘制）。
 %Furhter (2) Any continuous-time Markov process with zero mean and independent, stationary increments is automatically a Brownian motion.
 
 \begin{figure}
@@ -238,6 +262,29 @@ However, always keep in mind that the "$\dd X_t$"-notation above is a purely inf
 If $u:\R^d\times[0,1]\to\R^d$ is continuously differentiable with a bounded derivative and $\sigma_t$ is continuous, then the SDE in \eqref{e:sde_generic} has a solution given by the unique stochastic process $(X_t)_{0\leq t\leq 1}$ satisfying \cref{e:infinitesimal_updates_sdes}.
 \end{theorem}
 If this was a stochastic calculus class, we would spend several lectures proving this theorem and constructing SDEs with full mathematical rigor, i.e. constructing a Brownian motion from first principles and constructing the process $X_{t}$ via \themebf{stochastic integration}. As we focus on machine learning in this class, we refer to \citep{mao2007stochastic} for a more technical treatment. Finally, note that every ODE is also an SDE - simply with a vanishing diffusion coefficient $\sigma_t=0$. Therefore, for the remainder of this class, \textbf{when we speak about SDEs, we consider ODEs as a special case}.
+
+\paragraph{从ODEs到SDEs。} SDE的思想是通过添加由布朗运动驱动的随机动力学来扩展ODE的确定性动力学。因为一切都是随机的，我们不能再像\cref{e:ode_ode}中那样取导数。因此，我们需要找到\textbf{不使用导数的ODEs等价表述}。为此，让我们将ODE的轨迹$(X_t)_{0\leq t\leq 1}$重写如下：
+\begin{alignat*}{3}
+    \frac{\dd}{\dd t} X_t &=  u_t(X_t) \quad &&\blacktriangleright\,\,\text{通过导数表达}\\
+    \overset{(i)}{\Leftrightarrow} \quad  \frac{1}{h}\left(X_{t+h}-X_{t}\right)&=u_t(X_t) + R_t(h)&&\\
+\Leftrightarrow \quad X_{t+h} &= X_{t}+hu_t(X_t) + hR_t(h)\quad &&\blacktriangleright\,\,\text{通过无穷小更新表达}
+\end{alignat*}
+其中$R_t(h)$描述一个对小$h$可忽略的函数，即满足$\lim\limits_{h\to 0}R_t(h)=0$，在$(i)$中我们只是使用导数的定义。上面的推导只是重述了我们已经知道的内容：ODE的轨迹$(X_t)_{0 \le t \le 1}$在每个时间步都沿方向$u_t(X_t)$迈出一小步。我们现在可以修改最后一个方程使其随机化：SDE的轨迹$(X_t)_{0 \le t \le 1}$在每个时间步都沿方向$u_t(X_t)$迈出一小步\themeit{加上}来自布朗运动的一些贡献：
+\begin{align}
+    X_{t+h} = X_{t}+\underbrace{hu_t(X_t)}_{\text{确定性}} + \sigma_t\underbrace{(W_{t+h}-W_{t})}_{\text{随机性}}+\underbrace{hR_t(h)}_{\text{误差项}}
+\end{align}
+其中$\sigma_t\geq 0$描述\themebf{扩散系数}，$R_t(h)$描述随机误差项，使得标准差$\mathbb{E}[\|R_t(h)\|^2]^{1/2}\to 0$当$h\to 0$时趋于零。上述描述了\themebf{随机微分方程（SDE）}。通常用以下符号记号表示：
+\begin{subequations}
+    \begin{align} 
+      \dd X_t &= u_t(X_t)\dd t + \sigma_t\dd W_t &&\blacktriangleright\,\,\text{SDE}\\
+      X_0 &= x_0               &&\blacktriangleright\,\,\text{初始条件}
+    \end{align}
+\end{subequations}
+但是，请始终记住上面的"$\dd X_t$"记号只是\cref{e:infinitesimal_updates_sdes}的纯粹非正式记号。不幸的是，SDEs不再有流映射$\phi_t$。这是因为$X_t$的值不再完全由$X_0\sim \pinit$确定，因为演化本身是随机的。尽管如此，与ODEs相同的方式，我们有：
+
+如果$u:\R^d\times[0,1]\to\R^d$是连续可微的且有有界导数，$\sigma_t$是连续的，那么\eqref{e:sde_generic}中的SDE有一个解，由满足\cref{e:infinitesimal_updates_sdes}的唯一随机过程$(X_t)_{0\leq t\leq 1}$给出。
+
+如果这是随机微积分课程，我们会花几节课来证明这个定理并以完全的数学严格性构造SDEs，即从第一原理构造布朗运动并通过\themebf{随机积分}构造过程$X_{t}$。由于我们在这门课中专注于机器学习，我们参考\citep{mao2007stochastic}以获得更技术性的处理。最后，注意每个ODE也是SDE——只是扩散系数$\sigma_t=0$消失了。因此，在本课程的其余部分，\textbf{当我们谈论SDEs时，我们将ODEs视为特殊情况}。
 % \begin{remarkbox}[A Note on Formality]
 % If this was a stochastic calculus class, we would spend more time constructing SDEs with full mathematical rigor, i.e. constructing a Brownian motion from first principles and constructing the process $X_{t}$ via \emph{stochastic integrals}. \ee{Revise: Those of you familiar with stochastic calculus will note that our discussion of SDEs has thus far been quite informal. For example, we have technically not actually shown that a Brownian motion even exists. If this were a class on stochastic calculus, we might proceed more formally, by e.g., constructing a Brownian motion and then arriving at SDEs via the notion of a \themeit{stochastic integral}. Nevertheless, we feel that this extra machinery is overly cumbersome for the need at hand, and have therefore opted to take a more direct approach.}
 % \end{remarkbox}
@@ -249,6 +296,12 @@ Let us consider a constant diffusion coefficient $\sigma_t=\sigma\geq 0$ and a c
 \dd X_t = -\theta X_t\dd t + \sigma dW_t.
 \end{align} 
 A solution $(X_t)_{0 \le t \le 1}$ to the above SDE is known as an \themebf{Ornstein-Uhlenbeck (OU) process}. We visualize it in \cref{fig:bm_ou_process}. The vector field $-\theta x$ pushes the process back to its center $0$ (as I always go the inverse direction of where I am), while the diffusion coefficient $\sigma$ always adds more noise. This process converges towards a Gaussian distribution $\mathcal{N}(0,\sigma^2)$ if we simulate it for $t\to \infty$. Note that for $\sigma=0$, we have a flow with linear vector field that we have studied in \cref{e:flow_linear_vf}.
+
+让我们考虑常数扩散系数$\sigma_t=\sigma\geq 0$和常数线性漂移$u_t(x)=-\theta x$（其中$\theta>0$），得到SDE
+\begin{align}
+\dd X_t = -\theta X_t\dd t + \sigma dW_t.
+\end{align} 
+上述SDE的解$(X_t)_{0 \le t \le 1}$被称为\themebf{Ornstein-Uhlenbeck（OU）过程}。我们在\cref{fig:bm_ou_process}中可视化了它。向量场$-\theta x$将过程推回到其中心$0$（因为我总是朝着我所在位置的相反方向移动），而扩散系数$\sigma$总是增加更多噪声。如果我们对$t\to \infty$进行模拟，这个过程会收敛到高斯分布$\mathcal{N}(0,\sigma^2)$。注意，对于$\sigma=0$，我们有一个具有线性向量场的流，我们在\cref{e:flow_linear_vf}中研究过。
 \end{examplebox}
 
 
@@ -258,6 +311,12 @@ A solution $(X_t)_{0 \le t \le 1}$ to the above SDE is known as an \themebf{Orns
     X_{t+h} = X_{t}+hu_t(X_t) + \sqrt{h}\sigma_t\epsilon_t,\quad \quad \epsilon_t \sim \mathcal{N}(0,I_d)
 \end{align}
 where $h=n^{-1}>0$ is a step size hyperparameter for $n \in \Nat$. In other words, to simulate using the Euler-Maruyama method, we take a small step in the direction of $u_t(X_t)$ as well as add a little bit of Gaussian noise scaled by $\sqrt{h}\sigma_t$. When simulating SDEs in this class (such as in the accompanying labs), we will usually stick to the Euler-Maruyama method.
+
+\paragraph{模拟SDE。} 如果您到目前为止对SDE的抽象定义感到困惑，那么不要担心。通过回答这个问题，可以给出思考SDEs的更直观方法：我们如何模拟SDE？最简单的这种方案被称为\themebf{Euler-Maruyama方法}，它本质上对SDEs的作用就像欧拉方法对ODEs的作用一样。使用Euler-Maruyama方法，我们用$X_0=x_0$初始化并通过以下方式迭代更新
+\begin{align}
+    X_{t+h} = X_{t}+hu_t(X_t) + \sqrt{h}\sigma_t\epsilon_t,\quad \quad \epsilon_t \sim \mathcal{N}(0,I_d)
+\end{align}
+其中$h=n^{-1}>0$是$n \in \Nat$的步长超参数。换句话说，要使用Euler-Maruyama方法进行模拟，我们沿$u_t(X_t)$方向迈出一小步，并添加一点由$\sqrt{h}\sigma_t$缩放的高斯噪声。在本课程中模拟SDEs时（例如在随附的实验中），我们通常会坚持使用Euler-Maruyama方法。
 
 \begin{algorithm}[h]
 \caption{Sampling from a Diffusion Model (Euler-Maruyama  method)}
@@ -282,6 +341,13 @@ where $h=n^{-1}>0$ is a step size hyperparameter for $n \in \Nat$. In other word
     X_0 &\sim \pinit  &&\blacktriangleright\,\,\text{random initialization}
     \end{align*}
 In \cref{alg:sampling_diffusion_model}, we describe the procedure by which to sample from a diffusion model with the Euler-Maruyama method. We summarize the results of this section as follows.
+
+\paragraph{扩散模型。} 我们现在可以通过SDE构造生成模型，就像我们对ODEs所做的那样。记住我们的目标是将简单分布$\pinit$转换为复杂分布$\pdata$。像对ODEs一样，用$X_0\sim \pinit$随机初始化的SDE模拟是这种转换的自然选择。为了参数化这个SDE，我们可以简单地参数化其核心成分——向量场$u_t$——一个神经网络$u_t^\theta$。因此，\themebf{扩散模型}由以下给出
+\begin{align*}
+    \dd X_t &= u_t^\theta(X_t)\dd t + \sigma_t \dd W_t &&\blacktriangleright\,\,\text{SDE}\\
+    X_0 &\sim \pinit  &&\blacktriangleright\,\,\text{随机初始化}
+    \end{align*}
+在\cref{alg:sampling_diffusion_model}中，我们描述了使用Euler-Maruyama方法从扩散模型采样的过程。我们总结本节的结果如下。
 \begin{summarybox}[SDE generative model] Throughout this document, a \themebf{diffusion model} consists of a neural network $u_t^\theta$ with parameters $\theta$ that parameterize a vector field and a fixed  diffusion coefficient $\sigma_t$:
 \begin{align*}
     \textbf{\sffamily Neural network: }&u^\theta:\R^d\times [0,1]\to \R^d,\,\, (x,t)\mapsto u_t^\theta(x)\text{  with parameters }\theta\\
@@ -296,3 +362,16 @@ To obtain samples from our SDE model (i.e. generate objects), the procedure is a
 A diffusion model with $\sigma_t=0$ is a \themebf{flow model}.
 \label{summary:diffusion_model}
 \end{summarybox}
+
+在整个文档中，\themebf{扩散模型}由一个带有参数$\theta$的神经网络$u_t^\theta$（参数化向量场）和一个固定的扩散系数$\sigma_t$组成：
+\begin{align*}
+    \textbf{\sffamily 神经网络：}&u^\theta:\R^d\times [0,1]\to \R^d,\,\, (x,t)\mapsto u_t^\theta(x)\text{  带参数}\theta\\
+    \textbf{\sffamily 固定的：}&\sigma_t:[0,1]\to [0,\infty),\,\, t\mapsto \sigma_t
+\end{align*}
+要从我们的SDE模型获得样本（即生成对象），过程如下：
+\begin{align*}
+\textbf{\sffamily 初始化：}\quad X_0&\sim\pinit \quad  &&\blacktriangleright\,\,\text{用简单分布初始化，例如高斯分布}\\
+    \textbf{\sffamily 模拟：}\quad \dd X_t &= u_t^\theta(X_t)\dd t + \sigma_t\dd W_t\quad &&\blacktriangleright\,\,\text{从0到1模拟SDE}\\
+    \textbf{\sffamily 目标：}\quad X_1 &\sim  \pdata \quad &&\blacktriangleright\,\,\text{目标是使$X_1$具有分布$\pdata$}
+\end{align*}
+$\sigma_t=0$的扩散模型是\themebf{流模型}。
