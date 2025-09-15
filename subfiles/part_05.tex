@@ -68,13 +68,31 @@ Expanding the expectation over all such choices of $y$, and over all times $t \i
 \end{equation}
 One of the main differences between the guided objective in \cref{eq:guided_cfm} and the unguided objective from \cref{eq:cfm} is that here we are sampling $(z,y) \sim \pdata$ rather than just $z \sim \pdata$. The reason is that our data distribution is now, in principle, a joint distribution over e.g., both images $z$ and text prompts $y$. In practice, this means that a PyTorch implementation of \cref{eq:guided_cfm} would involve a dataloader which returned batches of \textbf{both $z$ and $y$}. The above procedure leads to a faithful generation procedure of $\pdata(\cdot|y)$.
 
+\subsubsection{流模型的指导}
+如果我们想象固定我们对$y$的选择，并将我们的数据分布取为$p_{\text{data}}(x|y)$，那么我们已经恢复了无指导生成问题，并且可以相应地使用条件流匹配目标构建生成模型，即：
+\begin{equation}
+    \mathbb{E}_{z \sim p_{\text{data}}(\cdot|y), x \sim p_t(\cdot|z)} \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2.
+\end{equation}
+注意标签$y$不影响条件概率路径$p_t(\cdot|z)$或条件向量场$\uref_t(x|z)$（尽管原则上，我们可以使其依赖）。将期望扩展到所有这样的$y$选择，以及所有时间$t \in \text{Unif}[0,1)$，我们因此得到一个\themebf{引导条件流匹配目标}
+\begin{equation}
+    \label{eq:guided_cfm}
+    \mathcal{L}_{\text{CFM}}^{\text{guided}}(\theta) = \mathbb{E}_{(z,y) \sim p_{\text{data}}(z,y),\,t\sim \text{Unif}[0,1),\,x\sim p_t(\cdot|z)} \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2.
+\end{equation}
+\cref{eq:guided_cfm}中的引导目标与\cref{eq:cfm}中的无引导目标之间的主要区别之一是，这里我们采样$(z,y) \sim \pdata$而不是仅仅$z \sim \pdata$。原因是我们的数据分布现在原则上是关于例如图像$z$和文本提示$y$的联合分布。在实践中，这意味着\cref{eq:guided_cfm}的PyTorch实现将涉及一个返回\textbf{$z$和$y$}批次的数据加载器。上述过程导致$\pdata(\cdot|y)$的忠实生成过程。
+
 
 \paragraph{Classifier-Free Guidance.} While the above conditional training procedure is theoretically valid, it was soon empirically realized that images samples with this procedure did not fit well enough to the desired label $y$. It was discovered that perceptual quality is increased when the effect of the guidance variable $y$ is artificially reinforced. This insight was distilled into a technique known as \themebf{classifier-free guidance} that is widely used in the context of state-of-the-art diffusion models, and which we discuss next. For simplicity, we will focus here on the case of Gaussian probability paths. Recall from \cref{eq:gaussian_conditional_probability_paths}
  that a \textbf{Gaussian conditional probability path} is given by
 \begin{align*}
     p_t(\cdot|\dap) &= \mathcal{N}(\alpha_t \dap,\beta_t^2 I_d)
 \end{align*}
-where the \text{noise schedulers} $\alpha_t$ and $\beta_t$ are continuously differentiable, monotonic, and satisfy $\alpha_0 = \beta_1 = 0$ and $\alpha_1 = \beta_0 = 1$. 
+where the \text{noise schedulers} $\alpha_t$ and $\beta_t$ are continuously differentiable, monotonic, and satisfy $\alpha_0 = \beta_1 = 0$ and $\alpha_1 = \beta_0 = 1$.
+
+\paragraph{无分类器指导。} 虽然上述条件训练程序在理论上是有效的，但很快在经验上发现，使用此程序的图像样本不能很好地符合所需的标签$y$。人们发现，当指导变量$y$的效果被人为强化时，感知质量会提高。这一洞察被提炼成一种称为\themebf{无分类器指导}的技术，该技术在最先进的扩散模型中被广泛使用，我们接下来讨论。为简单起见，我们将在这里专注于高斯概率路径的情况。回顾\cref{eq:gaussian_conditional_probability_paths}，\textbf{高斯条件概率路径}由以下给出：
+\begin{align*}
+    p_t(\cdot|\dap) &= \mathcal{N}(\alpha_t \dap,\beta_t^2 I_d)
+\end{align*}
+其中\text{噪声调度器}$\alpha_t$和$\beta_t$是连续可微的、单调的，并满足$\alpha_0 = \beta_1 = 0$和$\alpha_1 = \beta_0 = 1$。 
 %\ph{I uncommented a paragraph here because it was unnecessary} 
 %In the guided setting, our the picture remains essentially the same: the probability path is essentially only a property of $z$ and not $y$. Explicitly, we may define the guided Gaussian conditional probability path as 
 %\begin{align*}
@@ -90,6 +108,16 @@ where
 \begin{equation}
    (a_t, b_t) = \left(\frac{\dot{\alpha}_t}{\alpha_t}, \frac{\dot{\alpha}_t \beta_t^2-\dot{\beta}_t \beta_t \alpha_t}{\alpha_t}\right). 
 \end{equation}
+
+为了获得对无分类器指导的直觉，我们可以使用\cref{prop:conversion_formula_gaussian_prob_path}通过引导评分函数$\nabla\log p_t(x|y)$将引导向量场$\uref_t(x|y)$重写为以下形式：
+\begin{equation}
+    \uref_t(x|y) = a_tx + b_t\nabla \log p_t(x|y),
+\end{equation}
+其中
+\begin{equation}
+   (a_t, b_t) = \left(\frac{\dot{\alpha}_t}{\alpha_t}, \frac{\dot{\alpha}_t \beta_t^2-\dot{\beta}_t \beta_t \alpha_t}{\alpha_t}\right). 
+\end{equation}
+
 However, notice that by Bayes' rule, we can rewrite the guided score as
 \begin{equation}
    \nabla \log p_t(x|y) = \nabla \log \left(\frac{p_t(x)p_t(y|x)}{p_t(y)}\right) = \nabla \log p_t(x) + \nabla \log p_t(y|x), 
@@ -99,13 +127,33 @@ where we used that the gradient $\nabla$ is taken with respect to the variable $
 \begin{align*}
     \uref_t(x|y) = a_tx + b_t(\nabla \log p_t(x) + \nabla \log p_t(y|x)) = \uref_t(x) + b_t \nabla \log p_t(x|y).
 \end{align*}
+
+然而，注意通过贝叶斯法则，我们可以将引导评分重写为：
+\begin{equation}
+   \nabla \log p_t(x|y) = \nabla \log \left(\frac{p_t(x)p_t(y|x)}{p_t(y)}\right) = \nabla \log p_t(x) + \nabla \log p_t(y|x), 
+   \label{eq:bayes_rule}
+\end{equation}
+其中我们使用了梯度$\nabla$是关于变量$x$的，所以$\nabla \log p_t(y) = 0$。因此我们可以重写为：
+\begin{align*}
+    \uref_t(x|y) = a_tx + b_t(\nabla \log p_t(x) + \nabla \log p_t(y|x)) = \uref_t(x) + b_t \nabla \log p_t(x|y).
+\end{align*}
+
 Notice the shape of the above equation: The guided vector field $\uref_t(x|y)$ is a sum of the unguided vector field \emph{plus} a guided score $\nabla\log p_t(x|y)$. As people observed that their image $x$ did not fit their prompt $y$ well enough, it was a natural idea to scale up the contribution of the $\nabla \log p_t(y|x)$ term, yielding
 \begin{align*}
     \tilde{u}_t(x|y) = \uref_t(x) + w b_t \nabla \log p_t(y|x),
 \end{align*}
-where $w > 1$ is known as the \themebf{guidance scale}. Note that this is a heuristic: for $w \neq 1$, it holds that $\tilde{u}_t(x|y) \neq \uref_t(x|y)$, i.e. therefore not the true, guided vector field. However, empirical results have shown to yield preferable results (when $w > 1$). 
+where $w > 1$ is known as the \themebf{guidance scale}. Note that this is a heuristic: for $w \neq 1$, it holds that $\tilde{u}_t(x|y) \neq \uref_t(x|y)$, i.e. therefore not the true, guided vector field. However, empirical results have shown to yield preferable results (when $w > 1$).
+
+注意上述方程的形式：引导向量场$\uref_t(x|y)$是无引导向量场\emph{加上}引导评分$\nabla\log p_t(x|y)$的和。当人们观察到他们的图像$x$不能很好地符合他们的提示$y$时，放大$\nabla \log p_t(y|x)$项的贡献是一个自然的想法，产生：
+\begin{align*}
+    \tilde{u}_t(x|y) = \uref_t(x) + w b_t \nabla \log p_t(y|x),
+\end{align*}
+其中$w > 1$被称为\themebf{指导尺度}。注意这是一个启发式方法：对于$w \neq 1$，有$\tilde{u}_t(x|y) \neq \uref_t(x|y)$，即因此不是真正的引导向量场。然而，经验结果表明（当$w > 1$时）能产生更好的结果。 
 \begin{remarkbox}[Where is the classifier?]
 The term $\log p_t(y|x)$ can be considered as a sort of classifier of noised data (i.e. it gives the likelihoods of $y$ given $x$). In fact, early works in diffusion trained actual classifiers and used them to the guide via the above procedure. This leads to \themebf{classifier guidance} \cite{classifier_guidance, yangsong_sde}. As it has been largely superseded by classifier-free guidance, we do not consider it here. 
+\end{remarkbox}
+\begin{remarkbox}[分类器在哪里？]
+项$\log p_t(y|x)$可以被视为一种对噪声数据的分类器（即它给出了给定$x$时$y$的似然）。实际上，扩散的早期工作训练了实际的分类器，并通过上述程序使用它们进行指导。这导致了\themebf{分类器指导}\cite{classifier_guidance, yangsong_sde}。由于它已被无分类器指导在很大程度上取代，我们在这里不予考虑。
 \end{remarkbox}
 
 We may again apply the equality $$\nabla \log p_t(x|y) = \nabla \log p_t(x) + \nabla \log p_t(y|x)$$ to obtain 
@@ -113,7 +161,14 @@ We may again apply the equality $$\nabla \log p_t(x|y) = \nabla \log p_t(x) + \n
 &= \uref_t(x) + w b_t (\nabla \log p_t(x|y) - \nabla \log p_t(x))\\
 &= \uref_t(x) - (w a_tx + w b_t \nabla \log p_t(x)) + (w a_t x + w b_t \nabla \log p_t(x|y))\\
 &= (1-w) \uref_t(x) + w \uref_t(x|y).\end{align*}
-We may therefore express the scaled guided vector field $\tilde{u}_t(x|y)$ as the linear combination of the unguided vector field $\uref_t(x)$ with the guided vector field $\uref_t(x|y)$. The idea might then to to train both an unguided $\uref_t(x)$ (using e.g., \cref{eq:cfm}) as well as a guided $\uref_t(x|y)$ (using e.g., \cref{eq:guided_cfm}), and then combine them at inference time to obtain $\tilde{u}_t(x|y)$. "But wait!", you might ask, "wouldn't we need to train two models then !?". It turns out we do can train both in model: we may thus augment our label set with a new, additional $\varnothing$ label that denotes \textbf{the absence of conditioning}. We can then treat $\uref_t(x)=\uref_t(x|\varnothing)$. With that, we do not need to train a separate model to reinforce the effect of a hypothetical classifier. This approach of training a conditional and unconditional model in one (and subsequently reinforcing the conditioning) is known as \themebf{classifier-free guidance} (CFG) \cite{cfg}. 
+We may therefore express the scaled guided vector field $\tilde{u}_t(x|y)$ as the linear combination of the unguided vector field $\uref_t(x)$ with the guided vector field $\uref_t(x|y)$. The idea might then to to train both an unguided $\uref_t(x)$ (using e.g., \cref{eq:cfm}) as well as a guided $\uref_t(x|y)$ (using e.g., \cref{eq:guided_cfm}), and then combine them at inference time to obtain $\tilde{u}_t(x|y)$. "But wait!", you might ask, "wouldn't we need to train two models then !?". It turns out we do can train both in model: we may thus augment our label set with a new, additional $\varnothing$ label that denotes \textbf{the absence of conditioning}. We can then treat $\uref_t(x)=\uref_t(x|\varnothing)$. With that, we do not need to train a separate model to reinforce the effect of a hypothetical classifier. This approach of training a conditional and unconditional model in one (and subsequently reinforcing the conditioning) is known as \themebf{classifier-free guidance} (CFG) \cite{cfg}.
+
+我们可以再次应用等式$$\nabla \log p_t(x|y) = \nabla \log p_t(x) + \nabla \log p_t(y|x)$$来得到：
+\begin{align*}\tilde{u}_t(x|y) &= \uref_t(x) + w b_t \nabla \log p_t(y|x)\\
+&= \uref_t(x) + w b_t (\nabla \log p_t(x|y) - \nabla \log p_t(x))\\
+&= \uref_t(x) - (w a_tx + w b_t \nabla \log p_t(x)) + (w a_t x + w b_t \nabla \log p_t(x|y))\\
+&= (1-w) \uref_t(x) + w \uref_t(x|y).\end{align*}
+因此，我们可以将缩放的引导向量场$\tilde{u}_t(x|y)$表达为无引导向量场$\uref_t(x)$与引导向量场$\uref_t(x|y)$的线性组合。那么想法可能是既训练无引导的$\uref_t(x)$（例如使用\cref{eq:cfm}）也训练引导的$\uref_t(x|y)$（例如使用\cref{eq:guided_cfm}），然后在推理时将它们组合以获得$\tilde{u}_t(x|y)$。"但是等等！"，你可能会问，"那我们不就需要训练两个模型了！？"。事实证明我们可以在一个模型中训练两者：我们可以用一个新的、额外的$\varnothing$标签来增强我们的标签集，该标签表示\textbf{缺乏条件化}。然后我们可以将$\uref_t(x)=\uref_t(x|\varnothing)$。有了这个，我们不需要训练一个单独的模型来强化假设分类器的效果。这种在一个模型中训练条件和无条件模型（并随后强化条件化）的方法被称为\themebf{无分类器指导}（CFG）\cite{cfg}。 
 
 \begin{remarkbox}[Derivation for general probability paths]
 Note that the construction
@@ -122,13 +177,29 @@ Note that the construction
 \end{equation*}
 is equally valid for any choice probability path, not just a Gaussian one. When $w=1$, it is straightforward to verify that $\tilde{u}_t(x|y)=\uref_t(x|y)$. Our derivation using Gaussian paths was simply to illustrate the intuition behind the construction, and in particular of amplifying the contribution of a ``classifier'' $\nabla \log p_t(y|x)$.
 \end{remarkbox}
+\begin{remarkbox}[一般概率路径的推导]
+注意构造
+\begin{equation*}
+    \tilde{u}_t(x|y) = (1-w) \uref_t(x) + w \uref_t(x|y),
+\end{equation*}
+对于任何选择的概率路径都同样有效，不仅仅是高斯路径。当$w=1$时，很容易验证$\tilde{u}_t(x|y)=\uref_t(x|y)$。我们使用高斯路径的推导只是为了说明构造背后的直觉，特别是放大"分类器"$\nabla \log p_t(y|x)$贡献的直觉。
+\end{remarkbox}
 
 \paragraph{Training and Context-Free Guidance.} We must now amend the guided conditional flow matching objective from \cref{eq:guided_cfm} to account for the possibility of $y = \varnothing$. The challenge is that when sampling $(z,y) \sim \pdata$, we will never obtain $y = \varnothing$. It follows that we must introduce the possibility of $y = \varnothing$ artificially. To do so, we will define some hyperparameter $\eta$ to be the probability that we discard the original label $y$, and replace it with $\varnothing$. We thus arrive at our \themebf{CFG conditional flow matching training objective}
 \begin{align}
     \mathcal{L}_{\text{CFM}}^{\text{CFG}}(\theta) &= \,\,\mathbb{E}_{\square} \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2\\
     \square &= (z,y) \sim p_{\text{data}}(z,y),\, t \sim \text{Unif}[0,1),\, x \sim p_t(\cdot|z),\text{replace }y=\varnothing\text{ with prob. }\eta
 \end{align}
+
+\paragraph{训练和无上下文指导。} 现在我们必须修改\cref{eq:guided_cfm}中的引导条件流匹配目标以考虑$y = \varnothing$的可能性。挑战在于当从$\pdata$中采样$(z,y)$时，我们永远不会得到$y = \varnothing$。因此我们必须人为地引入$y = \varnothing$的可能性。为此，我们将定义某个超参数$\eta$作为我们丢弃原始标签$y$并用$\varnothing$替换它的概率。因此我们得到了我们的\themebf{CFG条件流匹配训练目标}
+\begin{align}
+    \mathcal{L}_{\text{CFM}}^{\text{CFG}}(\theta) &= \,\,\mathbb{E}_{\square} \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2\\
+    \square &= (z,y) \sim p_{\text{data}}(z,y),\, t \sim \text{Unif}[0,1),\, x \sim p_t(\cdot|z),\text{以概率}\eta\text{替换}y=\varnothing
+\end{align}
+
 We summarize our findings below.
+
+我们在下面总结我们的发现。
 
 \begin{summarybox}[Classifier-Free Guidance for Flow Models]
 Given the unguided marginal vector field $\uref_t(x|\varnothing)$, the guided marginal vector field $\uref_t(x|y)$, and a \themebf{guidance scale} $w > 1$, we define the \themebf{classifier-free guided vector field} $\tilde{u}_t(x|y)$ by 
@@ -157,7 +228,38 @@ Above, we made use multiple times of the fact that $\uref_t(x|z) = \uref_t(x|z,y
     \textbf{\sffamily Samples:}\quad X_1& \quad && \blacktriangleright\,\,\text{Goal is for $X_1$ to adhere to the guiding variable $y$.}
 \end{alignat*}
 \end{summarybox}
+
+\begin{summarybox}[流模型的无分类器指导]
+给定无引导边际向量场$\uref_t(x|\varnothing)$、引导边际向量场$\uref_t(x|y)$和\themebf{指导尺度}$w > 1$，我们通过以下方式定义\themebf{无分类器引导向量场}$\tilde{u}_t(x|y)$：
+\begin{equation}
+    \tilde{u}_t(x|y) = (1-w) \uref_t(x|\varnothing) + w \uref_t(x|y).
+    \label{eq:flow_cfg}
+\end{equation}
+通过使用同一个神经网络来近似$\uref_t(x|\varnothing)$和$\uref_t(x|y)$，我们可以利用以下\themebf{无分类器指导CFM}（CFG-CFM）目标，由以下给出：
+\begin{align}
+    \label{eq:cfg_guided_cfm}
+    \mathcal{L}_{\text{CFM}}^{\text{CFG}}(\theta) &= \,\,\mathbb{E}_{\square} \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2\\
+    \square &= (z,y) \sim p_{\text{data}}(z,y),\, t \sim \text{Unif}[0,1),\, x \sim p_t(\cdot|z),\text{以概率}\eta\text{替换}y=\varnothing
+\end{align}
+用通俗的语言，$\mathcal{L}_{\text{CFM}}^{\text{CFG}}$可以通过以下方式近似：
+\begin{alignat*}{3}
+    (z,y) &\sim \pdata(z,y) \quad\quad\quad\quad && \blacktriangleright \quad \text{从数据分布中采样$(z,y)$。}\\
+    t &\sim \text{Unif}[0,1) \quad\quad\quad\quad && \blacktriangleright \quad \text{在$[0,1)$上均匀采样$t$。}\\
+    x &\sim p_t(x|z) \quad\quad\quad\quad && \blacktriangleright \quad \text{从条件概率路径$p_t(x|z)$中采样$x$。}\\
+    \text{以概率}&\,\eta,\, y \gets \varnothing \quad\quad\quad\quad && \blacktriangleright \quad \text{以概率$\eta$将$y$替换为$\varnothing$。}\\
+    \widehat{\mathcal{L}_{\text{CFM}}^{\text{CFG}}(\theta)} &=  \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2 \quad\quad\quad\quad && \blacktriangleright \quad \text{对条件向量场回归模型。}
+\end{alignat*}
+上面，我们多次使用了$\uref_t(x|z) = \uref_t(x|z,y)$这一事实。在推理时，对于固定的$y$选择，我们可以通过以下方式采样：
+\begin{alignat*}{3}
+    \textbf{\sffamily 初始化:}\quad X_0&\sim\pinit(x) \quad  && \blacktriangleright\,\,\text{用简单分布（如高斯分布）初始化}\\
+    \textbf{\sffamily 仿真:}\quad \dd X_t &= \tilde{u}_t^\theta(X_t|y)\dd t \quad && \blacktriangleright\,\,\text{从$t=0$到$t=1$仿真ODE。}\\
+    \textbf{\sffamily 样本:}\quad X_1& \quad && \blacktriangleright\,\,\text{目标是让$X_1$符合引导变量$y$。}
+\end{alignat*}
+\end{summarybox}
+
 Note that the distribution of $X_1$ is not necessarily aligned with $X_1 \sim  \pdata(\cdot | y)$ anymore if we use a weight $w>1$. However, empirically, this shows better alignment with conditioning.
+
+注意，如果我们使用权重$w>1$，$X_1$的分布不一定再与$X_1 \sim  \pdata(\cdot | y)$对齐。然而，经验上，这显示出与条件化更好的对齐。
 \begin{figure}[!t]
     \centering
     \includegraphics[width=\linewidth]{figures/salimans_cfg.png}
