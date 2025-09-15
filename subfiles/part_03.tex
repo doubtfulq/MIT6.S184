@@ -177,27 +177,42 @@ Intuitively, the above procedure adds more noise for lower $t$ until time $t=0$,
 
 
 \subsection{Conditional and Marginal Vector Fields}
+
+\subsection{条件向量场和边际向量场}
+
 We proceed now by constructing a training target $\uref_t$ for a flow model using the recently defined notion of a probability path $p_t$. The idea is to construct $\uref_t$ from simple components that we can derive analytically by hand.
+
+我们现在使用刚刚定义的概率路径 $p_t$ 概念来为流模型构建训练目标 $\uref_t$。其思想是从可以手工解析推导的简单组件构建 $\uref_t$。
 \begin{theorem}[Marginalization trick]
 \label{thm:marginalization_trick}
 For every data point $z\in \mathbb{R}^d$, let $\uref_t(\cdot|z)$ denote a \themebf{conditional vector field}, defined so that the corresponding ODE yields the conditional probability path $p_t(\cdot|z)$, viz.,
+
+对于每个数据点 $z\in \mathbb{R}^d$，设 $\uref_t(\cdot|z)$ 表示一个 \themebf{条件向量场}，定义为使得相应的 ODE 产生条件概率路径 $p_t(\cdot|z)$，即：
 \begin{align}
 \label{eq:cond_ref_ode_conds}
     X_0&\sim\pinit,\quad \frac{\dd}{\dd t}X_t =\uref_t(X_t|z)\quad \Rightarrow \quad X_t\sim p_t(\cdot|z)\quad (0\leq t\leq 1).
 \end{align}
 Then the \themebf{marginal vector field} $\uref_t(x)$, defined by
+
+那么 \themebf{边际向量场} $\uref_t(x)$，定义为
 \begin{align}
     \label{eq:marginal_vector_field}
     \uref_t(x) = \int \uref_t(x|z)\frac{p_t(x|z)\pdata(z)}{p_t(x)}\dd z,
 \end{align}
 follows the marginal probability path, i.e. 
+
+遵循边际概率路径，即 
 \begin{align}
 \label{eq:marginal_ode_follows_marginal_path}
     X_0&\sim\pinit,\quad \frac{\dd}{\dd t}X_t =\uref_t(X_t)\quad \Rightarrow \quad X_t\sim p_t\quad (0\leq t\leq 1).
 \end{align}
 In particular, $X_1\sim \pdata$ for this ODE, so that we might say "$\uref_t$ converts noise $\pinit$ into data $\pdata$".
+
+特别地，对于这个 ODE，有 $X_1\sim \pdata$，因此我们可以说"$\uref_t$ 将噪声 $\pinit$ 转换为数据 $\pdata$"。
 \end{theorem}
 See \cref{fig:cond_marginal_path_simulation} for an illustration. Before we prove the marginalization trick, let us first explain why it is useful: The marginalization trick from \cref{thm:marginalization_trick} allows us to construct the marginal vector field from a conditional vector field. This simplifies the problem of finding a formula for a training target significantly as we can often find a conditional vector field $\uref_t(\cdot|z)$ satisfying \cref{eq:cond_ref_ode_conds} analytically by hand (i.e. by just doing some algebra ourselves). Let us illustrate this by deriving a conditional vector field $u_t(x|z)$ for our running example of a Gaussian probability path.
+
+参见 \cref{fig:cond_marginal_path_simulation} 的图示。在证明边际化技巧之前，让我们首先解释为什么它是有用的：\cref{thm:marginalization_trick} 中的边际化技巧允许我们从条件向量场构建边际向量场。这显著简化了寻找训练目标公式的问题，因为我们通常可以手工解析地找到满足 \cref{eq:cond_ref_ode_conds} 的条件向量场 $\uref_t(\cdot|z)$（即仅通过我们自己做一些代数运算）。让我们通过为高斯概率路径的运行示例推导条件向量场 $u_t(x|z)$ 来说明这一点。
 
 % The marginalization trick from \cref{thm:marginalization_trick} then allows us to construct the marginal vector field from that. All that is left to do is to learn the marginal vector field, which is what flow matching does - 
 
@@ -219,23 +234,33 @@ See \cref{fig:cond_marginal_path_simulation} for an illustration. Before we prov
 \end{figure}
 \begin{examplebox}[Target ODE for Gaussian probability paths]
 As before, let $p_t(\cdot|\dap) = \mathcal{N}(\alpha_t \dap,\beta_t^2 I_d)$ for noise schedulers $\alpha_t,\beta_t$ (see \cref{eq:gaussian_conditional_probability_paths}). Let $\dot{\alpha}_t=\partial_t\alpha_t$ and $\dot{\beta}_t=\partial_t\beta_t$ denote respective time derivatives of $\alpha_t$ and $\beta_t$. Here, we want to show that the \themebf{conditional Gaussian vector field} given by
+
+如前所述，对于噪声调度器 $\alpha_t,\beta_t$，设 $p_t(\cdot|\dap) = \mathcal{N}(\alpha_t \dap,\beta_t^2 I_d)$（见 \cref{eq:gaussian_conditional_probability_paths}）。设 $\dot{\alpha}_t=\partial_t\alpha_t$ 和 $\dot{\beta}_t=\partial_t\beta_t$ 分别表示 $\alpha_t$ 和 $\beta_t$ 的时间导数。在这里，我们想要证明由以下给出的 \themebf{条件高斯向量场}
 \begin{align}
 \label{eq:conditional_gaussian_vf}
     \uref_t(x|z) = \left(\dot{\alpha}_t-\frac{\dot{\beta}_t}{\beta_t}\alpha_t\right)z+\frac{\dot{\beta}_t}{\beta_t}x
 \end{align}
 is a valid conditional vector field model in the sense of \cref{thm:marginalization_trick}: its ODE trajectories $X_t$ satisfy $X_t\sim p_t(\cdot|z)=\mathcal{N}(\alpha_t z,\beta_t^2I_d)$ if $X_0\sim \mathcal{N}(0,I_d)$. In \cref{fig:cond_marginal_path_simulation}, we confirm this visually by comparing samples from the conditional probability path (ground truth) to samples from simulated ODE trajectories of this flow. As you can see, the distribution match. We will now prove this.
 
+是 \cref{thm:marginalization_trick} 意义下的有效条件向量场模型：如果 $X_0\sim \mathcal{N}(0,I_d)$，其 ODE 轨迹 $X_t$ 满足 $X_t\sim p_t(\cdot|z)=\mathcal{N}(\alpha_t z,\beta_t^2I_d)$。在 \cref{fig:cond_marginal_path_simulation} 中，我们通过比较条件概率路径的样本（真实值）与该流的模拟 ODE 轨迹样本来视觉确认这一点。如您所见，分布匹配。我们现在将证明这一点。
+
 \begin{proof}
 Let us construct a conditional flow model $\psiref_t(x|z)$ first by defining
+
+让我们首先通过定义来构建条件流模型 $\psiref_t(x|z)$
 \begin{align}
     \label{eq:cond_flow_gaussian}
     \psiref_t(x|z) = \alpha_t z + \beta_t x.
 \end{align}
 If $X_t$ is the ODE trajectory of $\psiref_t(\cdot|z)$ with $X_0\sim\pinit = \mathcal{N}(0,I_d)$, then by definition
+
+如果 $X_t$ 是具有 $X_0\sim\pinit = \mathcal{N}(0,I_d)$ 的 $\psiref_t(\cdot|z)$ 的 ODE 轨迹，那么根据定义
 \begin{align*}
     X_t = \psiref_t(X_0|z) = \alpha_t z + \beta_t X_0 \sim \mathcal{N}(\alpha_t z,\beta^2 I_d) = p_t(\cdot|z).
 \end{align*}
 We conclude that the trajectories are distributed like the conditional probability path (i.e, \cref{eq:cond_ref_ode_conds} is fulfilled). It remains to extract the vector field $\uref_t(x|z)$ from $\psiref_t(x|z)$. By the definition of a flow (\cref{e:flow_flow}), it holds
+
+我们得出结论，轨迹的分布与条件概率路径相同（即满足 \cref{eq:cond_ref_ode_conds}）。剩下的是从 $\psiref_t(x|z)$ 中提取向量场 $\uref_t(x|z)$。根据流的定义（\cref{e:flow_flow}），有
 \begin{align*}
       \frac{\dd}{\dd t}\psiref_{t}(x|z) &= \uref_t(\psiref_t(x|z)|z)\quad \text{ for all }x,z\in\mathbb{R}^d\\
     \overset{(i)}{\Leftrightarrow} \quad \dot{\alpha}_tz+\dot{\beta}_tx &= \uref_t(\alpha_tz+\beta_t x|z)\quad \text{ for all }x,z\in\mathbb{R}^d\\
@@ -243,10 +268,14 @@ We conclude that the trajectories are distributed like the conditional probabili
     \overset{(iii)}{\Leftrightarrow} \quad\left(\dot{\alpha}_t-\frac{\dot{\beta}_t}{\beta_t}\alpha_t\right)z+\frac{\dot{\beta}_t}{\beta_t}x &= \uref_t(x|z)\quad \text{ for all }x,z\in\mathbb{R}^d
 \end{align*}
 where in $(i)$ we used the definition of $\psiref_t(x|z)$ (\cref{eq:cond_flow_gaussian}), in $(ii)$ we reparameterized $x\rightarrow (x-\alpha_t z)/\beta_t$, and in $(iii)$ we just did some algebra. Note that the last equation is the conditional Gaussian vector field as we defined in \cref{eq:conditional_gaussian_vf}. This proves the statement.\footnote{One can also double check this by plugging it into the continuity equation introduced later in this section.}
+
+其中在 $(i)$ 中我们使用了 $\psiref_t(x|z)$ 的定义（\cref{eq:cond_flow_gaussian}），在 $(ii)$ 中我们重新参数化了 $x\rightarrow (x-\alpha_t z)/\beta_t$，在 $(iii)$ 中我们只是做了一些代数运算。注意最后的方程就是我们在 \cref{eq:conditional_gaussian_vf} 中定义的条件高斯向量场。这证明了该陈述。\footnote{也可以通过将其代入本节后面介绍的连续性方程来验证这一点。}
 \end{proof}
 \end{examplebox}
 
 The remainder of this section will now prove \cref{thm:marginalization_trick} via the \themebf{continuity equation}, a fundamental result in mathematics and physics. To explain it, we will require the use of the \themebf{divergence} operator $\divv$, which we define as
+
+本节的其余部分现在将通过 \themebf{连续性方程}（数学和物理学中的一个基本结果）来证明 \cref{thm:marginalization_trick}。为了解释它，我们需要使用 \themebf{散度} 算子 $\divv$，定义为
 \begin{align}
 \label{eq:divergence_laplacian_definition}
     \divv(v_t)(x)=&\sum\limits_{i=1}^{d}\frac{\partial}{\partial x_i}v_t(x)
@@ -254,15 +283,23 @@ The remainder of this section will now prove \cref{thm:marginalization_trick} vi
 \begin{theorem}[Continuity Equation]
 \label{thm:continuity_equation}
 Let us consider an flow model with vector field $\uref_t$ with $X_0\sim\pinit$. Then $X_t\sim p_t$ for all $0\leq t\leq 1$ if and only if
+
+考虑一个具有向量场 $\uref_t$ 和 $X_0\sim\pinit$ 的流模型。那么对于所有 $0\leq t\leq 1$，$X_t\sim p_t$ 当且仅当
 \begin{align}
 \label{e:continuity_equation}
 \partial_t p_t(x)=-\divv (p_t\uref_t)(x)\quad \text{ for all }x\in\R^d, 0\leq t\leq 1,
 \end{align}
 where $\partial_tp_t(x)= \frac{\dd}{\dd t}p_t(x)$ denotes the time-derivative of $p_t(x)$. Equation \ref{e:continuity_equation} is known as the \themebf{continuity equation}.
+
+其中 $\partial_tp_t(x)= \frac{\dd}{\dd t}p_t(x)$ 表示 $p_t(x)$ 的时间导数。方程 \ref{e:continuity_equation} 被称为 \themebf{连续性方程}。
 \end{theorem}
 For the mathematically-inclined reader, we present a self-contained proof of the Continuity Equation in \cref{subsec:proof_fokker_planck}. Before we move on, let us try and understand intuitively the continuity equation. The left-hand side $\partial_tp_t(x)$ describes how much the probability $p_t(x)$ at $x$ changes over time. Intuitively, the change should correspond to the net inflow of probability mass. For a flow model, a particle $X_t$ follows along the vector field $\uref_t$. As you might recall from physics, the divergence measures a sort of net outflow from the vector field. Therefore, the negative divergence measures the net inflow. Scaling this by the total probability mass currently residing at $x$, we get that the net $-\divv (p_tu_t)$ measures the total inflow of probability mass. Since probability mass is conserved, the left-hand and right-hand side of the equation should be the same! We now proceed with a proof of the marginalization trick from \cref{thm:marginalization_trick}.
+
+对于数学倾向的读者，我们在 \cref{subsec:proof_fokker_planck} 中提供了连续性方程的自包含证明。在继续之前，让我们尝试直观地理解连续性方程。左侧 $\partial_tp_t(x)$ 描述了 $x$ 处的概率 $p_t(x)$ 随时间的变化量。直观地说，这种变化应该对应于概率质量的净流入。对于流模型，粒子 $X_t$ 沿着向量场 $\uref_t$ 移动。正如您可能从物理学中回忆起的，散度衡量向量场的某种净流出。因此，负散度衡量净流入。将其乘以当前驻留在 $x$ 的总概率质量，我们得到净 $-\divv (p_tu_t)$ 衡量概率质量的总流入。由于概率质量守恒，方程的左侧和右侧应该相同！我们现在继续证明 \cref{thm:marginalization_trick} 中的边际化技巧。
 \begin{proof}
 By \cref{thm:continuity_equation}, we have to show that the marginal vector field $\uref_t$, as defined as in \cref{eq:marginal_vector_field}, satisfies the continuity equation. We can do this by direct calculation:
+
+根据 \cref{thm:continuity_equation}，我们必须证明边际向量场 $\uref_t$（如 \cref{eq:marginal_vector_field} 中定义的）满足连续性方程。我们可以通过直接计算来做到这一点：
 \begin{align*}
 \partial_t p_t(x) &\overset{(i)}
 {=} \partial_t\int p_t(x|\dap) \pdata (z) \dd z\\
@@ -273,6 +310,8 @@ By \cref{thm:continuity_equation}, we have to show that the marginal vector fiel
 &\overset{(v)}{=} -\divv \left(p_t\uref_t\right)(x),
 \end{align*}
 where in $(i)$ we used the definition of $p_t(x)$ in \cref{eq:marginal_prob_path}, in $(ii)$ we used the continuity equation for the conditional probability path $p_t(\cdot|z)$, in $(iii)$ we swapped the integral and divergence operator using \cref{eq:divergence_laplacian_definition}, in $(iv)$ we multiplied and divided by $p_t(x)$, and in $(v)$ we used \cref{eq:marginal_vector_field}. The beginning and end of the above chain of equations show that the continuity equation is fulfilled for $\uref_t$. By \cref{thm:continuity_equation}, this is enough to imply \cref{eq:marginal_ode_follows_marginal_path}, and we are done.
+
+其中在 $(i)$ 中我们使用了 \cref{eq:marginal_prob_path} 中 $p_t(x)$ 的定义，在 $(ii)$ 中我们使用了条件概率路径 $p_t(\cdot|z)$ 的连续性方程，在 $(iii)$ 中我们使用 \cref{eq:divergence_laplacian_definition} 交换了积分和散度算子，在 $(iv)$ 中我们乘除了 $p_t(x)$，在 $(v)$ 中我们使用了 \cref{eq:marginal_vector_field}。上述方程链的开始和结束表明连续性方程对 $\uref_t$ 成立。根据 \cref{thm:continuity_equation}，这足以推出 \cref{eq:marginal_ode_follows_marginal_path}，我们完成了证明。
 \end{proof}
 
 
@@ -292,10 +331,17 @@ where in $(i)$ we used the definition of $p_t(x)$ in \cref{eq:marginal_prob_path
 \end{figure}
 
 \subsection{Conditional and Marginal Score Functions}
+
+\subsection{条件得分函数和边际得分函数}
+
 We just successfully constructed a training target for a flow model. We now extend this reasoning to SDEs. To do so, let us define the \themebf{marginal score function} of $p_t$ as $\nabla\log p_t(x)$. We can use this to extend the ODE from the previous section to an SDE, as the following result demonstrates.
+
+我们刚刚成功构建了流模型的训练目标。现在我们将这种推理扩展到 SDE。为此，让我们将 $p_t$ 的 \themebf{边际得分函数} 定义为 $\nabla\log p_t(x)$。我们可以使用它将上一节的 ODE 扩展到 SDE，如下面的结果所示。
 \begin{theorem}[SDE extension trick]
 \label{thm:langevin_trick}
 Define the conditional and marginal vector fields $\uref_t(x|z)$ and $\uref_t(x)$ as before. Then, for diffusion coefficient $\sigma_t\geq 0$, we may construct an SDE which follows the same probability path:
+
+如前所述定义条件和边际向量场 $\uref_t(x|z)$ 和 $\uref_t(x)$。那么，对于扩散系数 $\sigma_t\geq 0$，我们可以构建一个遵循相同概率路径的 SDE：
 \begin{align}
 \label{eq:sde_extension}
     X_0\sim&\pinit,\quad \dd X_t =\left[\uref_t(X_t)+\frac{\sigma_t^2}{2}\nabla\log p_t(X_t)\right]\dd t +\sigma_t\dd W_t\\
@@ -305,6 +351,8 @@ Define the conditional and marginal vector fields $\uref_t(x|z)$ and $\uref_t(x)
 In particular, $X_1\sim \pdata$ for this SDE. The same identity holds if we replace the marginal probability $p_t(x)$ and vector field $\uref_t(x)$ with the conditional probability path $p_t(x|z)$ and vector field $\uref_t(x|z)$.
 \end{theorem}
 We illustrate the theorem in \cref{fig:thm_sde_extension}. The formula in \cref{thm:langevin_trick} is useful because, similar to before, we can express the marginal score function via the \themebf{conditional score function} $\nabla\log p_t(x|z)$
+
+我们在 \cref{fig:thm_sde_extension} 中说明了这个定理。\cref{thm:langevin_trick} 中的公式是有用的，因为与之前类似，我们可以通过 \themebf{条件得分函数} $\nabla\log p_t(x|z)$ 来表达边际得分函数
 \begin{align}
 \label{e:marginal_score}
 \nabla\log p_t(x) = \frac{\nabla p_t(x)}{p_t(x)}
@@ -313,6 +361,8 @@ We illustrate the theorem in \cref{fig:thm_sde_extension}. The formula in \cref{
 =\int \nabla \log p_t(x|z)\frac{ p_t(x|z)\pdata(z)}{p_t(x)}\dd z
 \end{align}
 and the conditional score function $\nabla \log p_t(x|z)$ is something we usually know analytically, as illustrated by the following example.
+
+条件得分函数 $\nabla \log p_t(x|z)$ 通常是我们可以解析获得的，如下面的例子所示。
 \begin{examplebox}[Score Function for Gaussian Probability Paths.] 
 For the Gaussian path $p_t(x|z)=\mathcal{N}(x;\alpha_t z,\beta_t^2 I_d)$, we can use the form of the Gaussian probability density (see \cref{e:gaussian}) to get
 \begin{align}
@@ -322,6 +372,8 @@ For the Gaussian path $p_t(x|z)=\mathcal{N}(x;\alpha_t z,\beta_t^2 I_d)$, we can
 Note that the score is a linear function of $x$. This is a unique feature of Gaussian distributions.
 \end{examplebox}
 In the remainder of this section, we will prove  \cref{thm:langevin_trick} via the \themebf{Fokker-Planck equation}, which extends the continuity equation from ODEs to SDEs. To do so, let us first define the \themebf{Laplacian} operator $\Delta$ via
+
+在本节的其余部分，我们将通过 \themebf{福克-普朗克方程} 来证明 \cref{thm:langevin_trick}，该方程将连续性方程从 ODE 扩展到 SDE。为此，让我们首先通过以下方式定义 \themebf{拉普拉斯} 算子 $\Delta$
 \begin{align}
     \label{eq:laplacian_definition}
     \Delta w_t(x)=&\sum\limits_{i=1}^{d}\frac{\partial^2}{\partial^2 x_i}w_t(x)=\divv(\nabla w_t)(x).
@@ -329,20 +381,31 @@ In the remainder of this section, we will prove  \cref{thm:langevin_trick} via t
 \begin{theorem}[Fokker-Planck Equation]
 \label{thm:fokker_planck}
 Let $p_t$ be a probability path and let us consider the SDE
+
+设 $p_t$ 是一个概率路径，考虑 SDE
 \begin{align*}
     X_0\sim \pinit, \quad \dd X_t = u_t(X_t)\dd t + \sigma_t\dd W_t.
 \end{align*}
 Then $X_t$ has distribution $p_t$ for all $0\leq t\leq 1$ if and only if the \themebf{Fokker-Planck equation} holds:
+
+那么对于所有 $0\leq t\leq 1$，$X_t$ 具有分布 $p_t$ 当且仅当 \themebf{福克-普朗克方程} 成立：
     \begin{align}
     \label{e:fokker_planck}
     \partial_t p_t(x) = -\divv (p_t u_t)(x)+\frac{\sigma_t^2}{2}\Delta p_t (x)\quad \text{ for all }x\in\R^d, 0\leq t\leq 1.
     \end{align}     
 \end{theorem}
 A self-contained proof of the Fokker-Planck equation can be found in \cref{subsec:proof_fokker_planck}. Note that the continuity equation is recovered from the Fokker-Planck equation when $\sigma_t=0$. The additional Laplacian term $\Delta p_t$ might be hard to rationalize at first. Those familiar with physics will note that the same term also appears in the heat equation (which is in fact a special case of the Fokker-Planck equation). Heat diffuses through a medium. We also add a diffusion process (not a physical but a mathematical one) and hence we add this additional Laplacian term. 
+
+福克-普朗克方程的自包含证明可在 \cref{subsec:proof_fokker_planck} 中找到。注意当 $\sigma_t=0$ 时，连续性方程可以从福克-普朗克方程中恢复。额外的拉普拉斯项 $\Delta p_t$ 起初可能难以理解。那些熟悉物理学的人会注意到，同样的项也出现在热方程中（实际上是福克-普朗克方程的特例）。热量在介质中扩散。我们也添加了一个扩散过程（不是物理的而是数学的），因此我们添加了这个额外的拉普拉斯项。
+
 Let us now use the Fokker-Planck equation to help us prove \cref{thm:langevin_trick}.
+
+现在让我们使用福克-普朗克方程来帮助证明 \cref{thm:langevin_trick}。
 
 \begin{proof}[Proof of \Cref{thm:langevin_trick}]
  By \cref{thm:fokker_planck}, we need to show that that the SDE defined in \cref{eq:sde_extension} satisfies the Fokker-Planck equation for $p_t$. We can do this by direction calculation:
+
+根据 \cref{thm:fokker_planck}，我们需要证明 \cref{eq:sde_extension} 中定义的 SDE 满足 $p_t$ 的福克-普朗克方程。我们可以通过直接计算来做到这一点：
 \begin{align*}
     \partial_t p_t(x) \overset{(i)}{=}& - \divv(p_t\uref_t)(x)\\
     \overset{(ii)}{=}& - \divv(p_t\uref_t)(x) -\frac{\sigma_t^2}{2}\Delta p_t(x)+\frac{\sigma_t^2}{2}\Delta p_t(x)\\
@@ -351,13 +414,21 @@ Let us now use the Fokker-Planck equation to help us prove \cref{thm:langevin_tr
     \overset{(v)}{=}&- \divv\left(p_t\left[\uref_t+\frac{\sigma_t^2}{2}\nabla \log p_t\right]\right)(x)+\frac{\sigma_t^2}{2}\Delta p_t(x),
 \end{align*}
 where in $(i)$ we used the Contuity Equation, in $(ii)$ we added and subtracted the same term, in $(iii)$ we used the definition of the Laplacian (\cref{eq:laplacian_definition}), in $(iv)$ we used that $\nabla\log p_t=\frac{\nabla p_t}{p_t}$, and in $(v)$ we used the linearity of the divergence operator. The above derivation shows that the SDE defined in \cref{eq:sde_extension} satisfies the Fokker-Planck equation for $p_t$. By \cref{thm:fokker_planck}, this implies $X_t\sim p_t$ for $0\leq t\leq 1$, as desired.
+
+其中在 $(i)$ 中我们使用了连续性方程，在 $(ii)$ 中我们加减了同一项，在 $(iii)$ 中我们使用了拉普拉斯算子的定义（\cref{eq:laplacian_definition}），在 $(iv)$ 中我们使用了 $\nabla\log p_t=\frac{\nabla p_t}{p_t}$，在 $(v)$ 中我们使用了散度算子的线性性。上述推导表明 \cref{eq:sde_extension} 中定义的 SDE 满足 $p_t$ 的福克-普朗克方程。根据 \cref{thm:fokker_planck}，这意味着对于 $0\leq t\leq 1$，有 $X_t\sim p_t$，正如所期望的。
 \end{proof}
 
 \begin{figure}[!t]
     \centering
     \includegraphics[width=\textwidth]{figures/langevin.png}
     \label{fig:langevin}
-    \caption{Top row: Particles evolving under the Langevin dynamics given by \cref{eq:langevin_dynamics}, with $p(x)$ taken to be a Gaussian mixture with 5 modes. Bottom row: A kernel density estimate of the same samples shown in the top row. As one can see, the distribution of samples converges to the equilibrium distribution $p$ (blue background colour).}
+    \caption{
+        Top row: Particles evolving under the Langevin dynamics given by \cref{eq:langevin_dynamics}, with $p(x)$ taken to be a Gaussian mixture with 5 modes. 
+        Bottom row: A kernel density estimate of the same samples shown in the top row. 
+        As one can see, the distribution of samples converges to the equilibrium distribution $p$ (blue background colour).
+        第一行：粒子在 \cref{eq:langevin_dynamics} 给出的朗之万动力学下演化，其中 $p(x)$ 被取为具有 5 个模式的高斯混合。
+        第二行：第一行所示相同样本的核密度估计。如您所见，样本的分布收敛到平衡分布 $p$（蓝色背景色）。
+    } 
 \end{figure}
 \begin{remarkbox}[Langevin dynamics.]
 The above construction has a famous special case when the probability path is static, i.e. $p_t=p$ for a fixed distribution $p$. In this case, we set $\uref_t=0$ and obtain the SDE
@@ -372,25 +443,37 @@ As with many Markov chains, these dynamics converge to the stationary distributi
 \end{remarkbox}
 
 Let us summarize the results of this section.
+
+让我们总结本节的结果。
 \begin{summarybox}[Derivation of the Training Target]
 \textbf{The flow training target is the marginal vector field $\uref_t$.} To construct it, we choose a \themebf{conditional probability path} $p_t(x|\dap)$ that fulfils $p_0(\cdot|z)=\pinit$, $p_1(\cdot|z)=\delta_{z}$. Next, we find a \themebf{conditional vector field} $\uflow_t(x|z)$ such that its corresponding flow $\psiref_t(x|z)$ fulfills
+
+\textbf{流模型的训练目标是边际向量场 $\uref_t$。} 为了构建它，我们选择一个满足 $p_0(\cdot|z)=\pinit$, $p_1(\cdot|z)=\delta_{z}$ 的 \themebf{条件概率路径} $p_t(x|\dap)$。接下来，我们找到一个 \themebf{条件向量场} $\uflow_t(x|z)$，使得其对应的流 $\psiref_t(x|z)$ 满足
 \begin{align*}
     X_0\sim \pinit \quad \Rightarrow \quad X_t = \psiref_t(X_0|z) \sim p_t(\cdot|z),
 \end{align*}
 or, equivalently, that $\uref_t$ satisfies the continuity equation.  Then the \themebf{marginal vector field} defined by
+
+或者等价地，$\uref_t$ 满足连续性方程。然后由以下定义的 \themebf{边际向量场}
 \begin{align}
     \label{eq:marginal_vector_field_restated}
     \uref_t(x) = \int \uref_t(x|z)\frac{p_t(x|z)\pdata(z)}{p_t(x)}\dd z,
 \end{align}
 follows the marginal probability path, i.e.,
+
+遵循边际概率路径，即
 \begin{align}
     \label{eq:marginal_ode_follows_marginal_path_restated}
     X_0&\sim\pinit,\quad \dd X_t =\uref_t(X_t)\dd t\Rightarrow X_t\sim p_t\quad (0\leq t\leq 1).
 \end{align}
 In particular, $X_1\sim \pdata$ for this ODE, so that $\uref_t$ "converts noise into data", as desired.
 
+特别地，对于这个 ODE，有 $X_1\sim \pdata$，因此 $\uref_t$ "将噪声转换为数据"，正如所期望的。
+
 
 \textbf{Extending to SDEs.} For a time-dependent diffusion coefficient $\sigma_t\geq 0$, we can extend the above ODE to an SDE with the same marginal probability path:
+
+\textbf{扩展到 SDE。} 对于时间相关的扩散系数 $\sigma_t\geq 0$，我们可以将上述 ODE 扩展为具有相同边际概率路径的 SDE：
 \begin{align}
 \label{eq:sde_extension_restated}
     X_0\sim&\pinit,\quad \dd X_t =\left[\uref_t(X_t)+\frac{\sigma_t^2}{2}\nabla\log p_t(X_t)\right]\dd t +\sigma_t\dd W_t\\
@@ -398,16 +481,22 @@ In particular, $X_1\sim \pdata$ for this ODE, so that $\uref_t$ "converts noise 
     \Rightarrow X_t\sim& p_t\quad (0\leq t\leq 1),
 \end{align}
 where $\nabla\log p_t(x)$ is the \themebf{marginal score function}
+
+其中 $\nabla\log p_t(x)$ 是 \themebf{边际得分函数}
 \begin{align}
 \nabla\log p_t(x) =&\int \nabla \log p_t(x|z)\frac{ p_t(x|z)\pdata(z)}{p_t(x)}\dd z.
 \end{align}
 In particular, for the trajectories $X_t$ of the above SDE, it holds that $X_1\sim \pdata$, so that the SDE "converts noise into data", as desired. An important example is the \themebf{Gaussian probability path}, yielding the formulae:
+
+特别地，对于上述 SDE 的轨迹 $X_t$，有 $X_1\sim \pdata$，因此 SDE "将噪声转换为数据"，正如所期望的。一个重要的例子是 \themebf{高斯概率路径}，产生以下公式：
 \begin{align}
 p_t(x|z) =& \mathcal{N}(x;\alpha_t z,\beta_t^2 I_d)\\
 \uflow_t(x|z)=&\left(\dot{\alpha}_t-\frac{\dot{\beta}_t}{\beta_t}\alpha_t\right)z+\frac{\dot{\beta}_t}{\beta_t}x\\
 \nabla \log p_t(x|z) =& -\frac{x-\alpha_t z}{\beta_t^2},
 \end{align}
 for \themebf{noise schedulers} $\alpha_t,\beta_t\in\mathbb{R}$: continuously differentiable, monotonic functions such that $\alpha_0=\beta_1=0$ $\alpha_1=\beta_0=1$.
+
+对于 \themebf{噪声调度器} $\alpha_t,\beta_t\in\mathbb{R}$：连续可微的单调函数，满足 $\alpha_0=\beta_1=0$，$\alpha_1=\beta_0=1$。
 \end{summarybox}
 
 % \subsection{Optimizing over all possible reference diffusion models.}\mycomment{Neural ODEs, Schrödinger Bridges.}
