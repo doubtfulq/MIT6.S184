@@ -144,7 +144,7 @@ where $\psi_t^\theta$ describes the flow induced by $u_t^\theta$. Note however: 
 \end{align*}
 其中$\psi_t^\theta$描述由$u_t^\theta$诱导的流。但是请注意：尽管它被称为\themeit{流模型}，\textbf{神经网络参数化的是向量场，而不是流}。为了计算流，我们需要模拟ODE。在\cref{alg:sampling_flow_model}中，我们总结了如何从流模型采样的过程。
 
-\begin{algorithm}[h]%TODO:这部分的中文翻译没有显示
+\begin{algorithm}[h]
 \caption{Sampling from a Flow Model with Euler method / 使用欧拉方法从流模型中采样}
 \label{alg:sampling_flow_model}
 \begin{algorithmic}[1]

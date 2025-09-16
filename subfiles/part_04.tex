@@ -194,18 +194,6 @@ Many famous state-of-the-art models have been trained using this simple yet effe
 \ENDFOR
 \end{algorithmic}
 \end{algorithm}
-%TODO:此处英文原文神秘消失
-输入：来自 $\pdata$ 的样本数据集 $z$，神经网络 $u_t^\theta$
-对于每个数据小批次：
-    从数据集中采样一个数据样本 $\dap$。
-    采样一个随机时间 $t \sim \text{Unif}_{[0,1]}$。
-    采样噪声 $\epsilon\sim\mathcal{N}(0,I_d)$
-    设置 $x=t z + (1-t) \epsilon$（一般情况：$x\sim p_t(\cdot|z)$）
-    计算损失
-    \begin{align*}
-        \mathcal{L}(\theta) =& \|u_t^\theta(x)-(z-\epsilon)\|^2 \quad （一般情况：=\|u_t^\theta(x)-\uref_t(x|z)\|^2）
-    \end{align*}
-    通过对 $\mathcal{L}(\theta)$ 的梯度下降更新模型参数 $\theta$。
 \begin{figure}[!t]
     \centering
     \begin{tabular}{ccc}
@@ -252,10 +240,10 @@ To approximate the marginal score $\nabla\log p_t$, we can use a neural network 
 \nabla\log p_t(x) =&\int \nabla \log p_t(x|z)\frac{ p_t(x|z)\pdata(z)}{p_t(x)}\,\dd z.
 \end{align}
 为了近似边际分数 $\nabla\log p_t$，我们可以使用一个神经网络，我们称之为\themebf{分数网络} $s_t^\theta:\mathbb{R}^d\times[0,1]\to\mathbb{R}^d$。与之前相同的方式，我们可以设计一个\themebf{分数匹配}损失和一个\themebf{条件分数匹配}损失：
-\begin{align*}
-    \mathcal{L}_{\text{SM}}(\theta) &=\mathbb{E}_{t\sim\text{Unif},z\sim \pdata, x\sim p_t(\cdot|\dap)}[\|s_t^\theta(x) - \nabla\log p_t(x)\|^2] &&\blacktriangleright\,\,\text{score matching loss/分数匹配损失}\\
-    \mathcal{L}_{\text{CSM}}(\theta) &=\mathbb{E}_{t\sim\text{Unif},z\sim \pdata, x\sim p_t(\cdot|\dap)}[\|s_t^\theta(x) - \nabla\log p_t(x|\dap)\|^2]  &&\blacktriangleright\,\,\text{conditional score matching loss/条件分数匹配损失}
-\end{align*}
+\begin{align}
+    \mathcal{L}_{\text{SM}}(\theta) &=\mathbb{E}_{t\sim\text{Unif},z\sim \pdata, x\sim p_t(\cdot|\dap)}[\|s_t^\theta(x) - \nabla\log p_t(x)\|^2] &&\blacktriangleright\,\,\text{score matching loss/分数匹配损失}\nonumber\\
+    \mathcal{L}_{\text{CSM}}(\theta) &=\mathbb{E}_{t\sim\text{Unif},z\sim \pdata, x\sim p_t(\cdot|\dap)}[\|s_t^\theta(x) - \nabla\log p_t(x|\dap)\|^2]  &&\blacktriangleright\,\,\text{conditional score matching loss/条件分数匹配损失}\label{eq:dsm}
+\end{align}
 where again the difference is using the marginal score $\nabla\log p_t(x)$ vs. using the conditional score $\nabla\log p_t(x|z)$. %\footnote{It would be more consistent to call it \emph{conditional} score matching loss but \emph{denoising} score matching is a term used in the literature. We will realize later why it is called \emph{denoising} score matching.} 
 As before, we ideally would want to minimize the score matching loss but can't because we don't know $\nabla\log p_t(x)$. But similarly as before, the conditional score matching loss is a tractable alternative:
 
