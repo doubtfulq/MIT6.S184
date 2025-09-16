@@ -145,16 +145,16 @@ where $\psi_t^\theta$ describes the flow induced by $u_t^\theta$. Note however: 
 其中$\psi_t^\theta$描述由$u_t^\theta$诱导的流。但是请注意：尽管它被称为\themeit{流模型}，\textbf{神经网络参数化的是向量场，而不是流}。为了计算流，我们需要模拟ODE。在\cref{alg:sampling_flow_model}中，我们总结了如何从流模型采样的过程。
 
 \begin{algorithm}[h]
-\caption{Sampling from a Flow Model with Euler method / 使用欧拉方法从流模型采样}
+\caption{Sampling from a Flow Model with Euler method}
 \label{alg:sampling_flow_model}
 \begin{algorithmic}[1]
-\REQUIRE Neural network vector field $u_t^\theta$, number of steps $n$ / 神经网络向量场 $u_t^\theta$，步数 $n$
-\STATE Set $t=0$ / 设置 $t=0$
-\STATE Set step size $h=\frac{1}{n}$ / 设置步长 $h=\frac{1}{n}$
-\STATE Draw a sample $X_0\sim \pinit$ / 抽取样本 $X_0\sim \pinit$
+\REQUIRE Neural network vector field $u_t^\theta$, number of steps $n$
+\STATE Set $t=0$
+\STATE Set step size $h=\frac{1}{n}$
+\STATE Draw a sample $X_0\sim \pinit$
 \FOR{$i=1,\dots,n-1$}
     \STATE $X_{t+h} = X_{t} + h u_t^\theta(X_t)$
-    \STATE Update $t\leftarrow t+h$ / 更新 $t\leftarrow t+h$
+    \STATE Update $t\leftarrow t+h$
 \ENDFOR
 \RETURN $X_1$
 \end{algorithmic}
@@ -236,7 +236,7 @@ In \cref{fig:brownian_motion_trajectories}, we plot a few example trajectories o
          % % \includegraphics[width=0.22\textwidth]{assets/flow_velocity/flow_v_14.png} &
          % \includegraphics[width=0.3\textwidth]{fm_guide_assets/flow_16.png} 
     \end{tabular}
-    \caption{Ornstein-Uhlenbeck过程（\cref{eq:ohrstein_uhlenbeck_process}）在维度$d=1$、$\theta=0.25$和各种$\sigma$选择（从左到右递增）下的图示。对于$\sigma=0$，我们恢复了一个当$t \to \infty$时收敛到原点的流（光滑、确定性轨迹）。对于$\sigma>0$，我们有随机路径，当$t\to\infty$时收敛到高斯分布$\mathcal{N}(0,\frac{\sigma^2}{2\theta})$。}
+    \caption{\label{fig:bm_ou_process} Illustration of Ornstein-Uhlenbeck processes (\cref{eq:ohrstein_uhlenbeck_process}) in dimension $d=1$ for $\theta=0.25$ and various choices of $\sigma$ (increasing from left to right). For $\sigma=0$, we recover a flow (smooth, deterministic trajectories) that converges to the origin as $t \to \infty$. For $\sigma>0$ we have random paths which converge towards the Gaussian $\mathcal{N}(0,\frac{\sigma^2}{2\theta})$ as $t\to\infty$.}
 \end{figure} 
 
 \paragraph{From ODEs to SDEs.} The idea of an SDE is to extend the deterministic dynamics of an ODE by adding stochastic dynamics driven by a Brownian motion. Because everything is stochastic, we may no longer take the derivative as in \cref{e:ode_ode}. Hence, we need to find an \textbf{equivalent formulation of ODEs that does not use derivatives}. For this, let us therefore rewrite trajectories $(X_t)_{0\leq t\leq 1}$ of an ODE as follows:
@@ -320,17 +320,17 @@ where $h=n^{-1}>0$ is a step size hyperparameter for $n \in \Nat$. In other word
 其中$h=n^{-1}>0$是$n \in \Nat$的步长超参数。换句话说，要使用Euler-Maruyama方法进行模拟，我们沿$u_t(X_t)$方向迈出一小步，并添加一点由$\sqrt{h}\sigma_t$缩放的高斯噪声。在本课程中模拟SDEs时（例如在随附的实验中），我们通常会坚持使用Euler-Maruyama方法。
 
 \begin{algorithm}[h]
-\caption{Sampling from a Diffusion Model (Euler-Maruyama method) / 使用Euler-Maruyama方法从扩散模型采样}
+\caption{Sampling from a Diffusion Model (Euler-Maruyama  method)}
 \label{alg:sampling_diffusion_model}
 \begin{algorithmic}[1]
-\REQUIRE Neural network $u_t^\theta$, number of steps $n$, diffusion coefficient $\sigma_t$ / 神经网络 $u_t^\theta$，步数 $n$，扩散系数 $\sigma_t$
-\STATE Set $t=0$ / 设置 $t=0$
-\STATE Set step size $h=\frac{1}{n}$ / 设置步长 $h=\frac{1}{n}$
-\STATE Draw a sample $X_0\sim \pinit$ / 抽取样本 $X_0\sim \pinit$
+\REQUIRE Neural network $u_t^\theta$, number of steps $n$, diffusion coefficient $\sigma_t$
+\STATE Set $t=0$
+\STATE Set step size $h=\frac{1}{n}$
+\STATE Draw a sample $X_0\sim \pinit$
 \FOR{$i=1,\dots,n-1$}
-    \STATE Draw a sample $\epsilon\sim \mathcal{N}(0,I_d)$ / 抽取样本 $\epsilon\sim \mathcal{N}(0,I_d)$
+    \STATE Draw a sample $\epsilon\sim \mathcal{N}(0,I_d)$
     \STATE $X_{t+h} = X_{t} + h u_t^\theta(X_t)+\sigma_t\sqrt{h}\epsilon$
-    \STATE Update $t\leftarrow t+h$ / 更新 $t\leftarrow t+h$
+    \STATE Update $t\leftarrow t+h$
 \ENDFOR
 \RETURN $X_1$
 \end{algorithmic}

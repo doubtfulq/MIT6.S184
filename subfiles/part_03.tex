@@ -32,7 +32,7 @@ There are a number of different approaches to deriving a training target for flo
     \begin{tabular}{ccc}
          \includegraphics[width=\textwidth]{figures/noised_mnist_reversed.png} &
     \end{tabular}
-    \caption{\label{fig:noising_image} Gradual interpolation from noise to data via  a Gaussian conditional probability path for a collection of images.}
+    \caption{\label{fig:noising_image} Gradual interpolation from noise to data via  a Gaussian conditional probability path for a collection of images.\\通过高斯条件概率路径从噪声到数据的一组图像的渐进插值。}
 \end{figure}
 
 \subsection{Conditional and Marginal Probability Path}
@@ -66,7 +66,7 @@ p_0 =\pinit\quad\text{and}\quad p_1=\pdata.\quad\quad\quad\quad \blacktriangleri
 \includegraphics[width=\textwidth]{figures/conditional_vs_marginal.png} &
          % \includegraphics[width=0.3\textwidth]{fm_guide_assets/flow_16.png} 
     \end{tabular}
-\caption{\label{fig:cond_marginal_path_histograms}Illustration of a conditional (top) and marginal (bottom) probability path. Here, we plot a Gaussian probability path with $\alpha_t=t,\beta_t=1-t$. The conditional probability path interpolates a Gaussian $\pinit=\mathcal{N}(0,I_d)$ and $\pdata=\delta_{z}$ for single data point $z$. The marginal probability path interpolates a Gaussian and a data distribution $\pdata$ (Here, $\pdata$ is a toy distribution in dimension $d=2$ represented by a chess board pattern.)}
+\caption{\label{fig:cond_marginal_path_histograms}Illustration of a conditional (top) and marginal (bottom) probability path. Here, we plot a Gaussian probability path with $\alpha_t=t,\beta_t=1-t$. The conditional probability path interpolates a Gaussian $\pinit=\mathcal{N}(0,I_d)$ and $\pdata=\delta_{z}$ for single data point $z$. The marginal probability path interpolates a Gaussian and a data distribution $\pdata$ (Here, $\pdata$ is a toy distribution in dimension $d=2$ represented by a chess board pattern.)\\条件（上）和边际（下）概率路径的图解。这里，我们绘制了高斯概率路径，其中 $\alpha_t=t,\beta_t=1-t$。条件概率路径在高斯分布 $\pinit=\mathcal{N}(0,I_d)$ 和单个数据点 $z$ 的 $\pdata=\delta_{z}$ 之间进行插值。边际概率路径在高斯分布和数据分布 $\pdata$ 之间进行插值（这里，$\pdata$ 是维度 $d=2$ 中由棋盘图案表示的玩具分布）。}
 \end{figure}
 % Note our goal in \cref{e:end_points_match} doesn't say anything about how $p_t^\theta$ should look like for intermediate time points $0<t<1$. Therefore, there is more degrees of freedom that we are allowed to choose.\footnote{It is also possible to optimize over all possible $p_t^\theta$. An example is Neural ODEs (see \cref{subsec:neural_odes}) or Schrödinger Bridges \citep{shi2024diffusion}. However, these methods usually don't scale well to large high-dimensional data such as images, videos, or molecules.}We do so by specifying an \themebf{(interpolating) probability path} $(p_t)_{0\leq t\leq 1}$ given by:
 % \begin{align}
@@ -97,7 +97,7 @@ p_0 =\pinit\quad\text{and}\quad p_1=\pdata.\quad\quad\quad\quad \blacktriangleri
 \begin{align}
 \label{eq:gaussian_conditional_probability_paths}
 p_t(\cdot|\dap) &= \mathcal{N}(\alpha_t \dap,\beta_t^2 I_d)
-& \blacktriangleright \,\, \text{Gaussian conditional path}
+& \blacktriangleright \,\, \text{Gaussian conditional path/高斯概率路径}
 \end{align}
 which, by the conditions we imposed on $\alpha_t$ and $\beta_t$, fulfills
 
@@ -111,7 +111,7 @@ where we have used the fact that a normal distribution with zero variance and me
 其中我们利用了方差为零、均值为 $\dap$ 的正态分布就是 $\delta_{\dap}$ 这一事实。因此，对于 $\pinit=\mathcal{N}(0,I_d)$，这种 $p_t(x|\dap)$ 的选择满足 \cref{eq:interpolating_condition_conditional_path}，因此是一个有效的条件插值路径。高斯条件概率路径具有几个有用的性质，使其特别适合我们的目标，因此我们将在本节的其余部分使用它作为条件概率路径的原型示例。在 \cref{fig:noising_image} 中，我们展示了它在图像上的应用。我们可以将从边际路径 $p_t$ 采样表示为： 
 \begin{align}
     \label{eq:gaussian_prob_path_sampling}
-    z\sim&\pdata,\,\epsilon\sim\pinit = \mathcal{N}(0,I_d) \,\Rightarrow\, x=\alpha_tz+\beta_t \epsilon\sim p_t \quad &\blacktriangleright \,\,\text{sampling from marginal Gaussian path}
+    z\sim&\pdata,\,\epsilon\sim\pinit = \mathcal{N}(0,I_d) \,\Rightarrow\, x=\alpha_tz+\beta_t \epsilon\sim p_t \quad &\blacktriangleright \,\,\text{sampling from marginal Gaussian path/从边际高斯路径采样}
 \end{align}
 Intuitively, the above procedure adds more noise for lower $t$ until time $t=0$, at which point there is only noise. In \cref{fig:cond_marginal_path_histograms}, we plot an example of such an interpolating path between Gaussian noise and a simple data distribution.
 
@@ -342,6 +342,8 @@ Define the conditional and marginal vector fields $\uref_t(x|z)$ and $\uref_t(x)
     \Rightarrow X_t\sim& p_t\quad (0\leq t\leq 1)
 \end{align}
 In particular, $X_1\sim \pdata$ for this SDE. The same identity holds if we replace the marginal probability $p_t(x)$ and vector field $\uref_t(x)$ with the conditional probability path $p_t(x|z)$ and vector field $\uref_t(x|z)$.
+
+特别地，对于这个SDE，$X_1\sim \pdata$。如果我们用条件概率路径$p_t(x|z)$和向量场$\uref_t(x|z)$分别替换边际概率$p_t(x)$和向量场$\uref_t(x)$，同样的恒等式也成立。
 \end{theorem}
 We illustrate the theorem in \cref{fig:thm_sde_extension}. The formula in \cref{thm:langevin_trick} is useful because, similar to before, we can express the marginal score function via the \themebf{conditional score function} $\nabla\log p_t(x|z)$
 
@@ -358,13 +360,18 @@ and the conditional score function $\nabla \log p_t(x|z)$ is something we usuall
 条件得分函数 $\nabla \log p_t(x|z)$ 通常是我们可以解析获得的，如下面的例子所示。
 \begin{examplebox}[Score Function for Gaussian Probability Paths.] 
 For the Gaussian path $p_t(x|z)=\mathcal{N}(x;\alpha_t z,\beta_t^2 I_d)$, we can use the form of the Gaussian probability density (see \cref{e:gaussian}) to get
+
+对于高斯路径 $p_t(x|z)=\mathcal{N}(x;\alpha_t z,\beta_t^2 I_d)$，我们可以使用高斯概率密度的形式（见 \cref{e:gaussian}）来得到
+
 \begin{align}
 \label{eq:cond_score_gaussian}
     \nabla \log p_t(x|z) = \nabla\log \mathcal{N}(x;\alpha_t z,\beta_t^2 I_d) = -\frac{x-\alpha_t z}{\beta_t^2}.
 \end{align}
+
 Note that the score is a linear function of $x$. This is a unique feature of Gaussian distributions.
+
+注意，得分函数是 $x$ 的线性函数。这是高斯分布的一个独特特征。
 \end{examplebox}
-In the remainder of this section, we will prove  \cref{thm:langevin_trick} via the \themebf{Fokker-Planck equation}, which extends the continuity equation from ODEs to SDEs. To do so, let us first define the \themebf{Laplacian} operator $\Delta$ via
 
 在本节的其余部分，我们将通过 \themebf{福克-普朗克方程} 来证明 \cref{thm:langevin_trick}，该方程将连续性方程从 ODE 扩展到 SDE。为此，让我们首先通过以下方式定义 \themebf{拉普拉斯} 算子 $\Delta$
 \begin{align}
@@ -425,14 +432,24 @@ where in $(i)$ we used the Contuity Equation, in $(ii)$ we added and subtracted 
 \end{figure}
 \begin{remarkbox}[Langevin dynamics.]
 The above construction has a famous special case when the probability path is static, i.e. $p_t=p$ for a fixed distribution $p$. In this case, we set $\uref_t=0$ and obtain the SDE
+
+上述构造有一个著名的特殊情况，即当概率路径是静态的时，即对于固定分布 $p$ 有 $p_t=p$。在这种情况下，我们设置 $\uref_t=0$ 并得到 SDE
+
 \begin{equation}
     \dd X_t = \frac{\sigma_t^2}{2}\nabla\log p(X_t)\dd t + \sigma_t dW_t \label{eq:langevin_dynamics},
 \end{equation}
+
 which is commonly known as \themebf{Langevin dynamics}. The fact that $p_t$ is static implies that $\partial_tp_t(x)=0$. It follows immediately from \cref{thm:langevin_trick} that these dynamics satisfy the Fokker-Planck equation for the static path $p_t=p$ in \cref{thm:langevin_trick}. Therefore, we may conclude that $p$ is a stationary distribution of Langevin dynamics, so that
+
+这通常被称为\themebf{朗之万动力学}。$p_t$ 是静态的这一事实意味着 $\partial_tp_t(x)=0$。从 \cref{thm:langevin_trick} 立即可知，这些动力学满足 \cref{thm:langevin_trick} 中静态路径 $p_t=p$ 的福克-普朗克方程。因此，我们可以得出结论，$p$ 是朗之万动力学的平稳分布，使得
+
 \begin{align*}
     X_0 \sim p\quad \Rightarrow \quad X_t \sim p\quad (t\geq 0)
 \end{align*}
+
 As with many Markov chains, these dynamics converge to the stationary distribution $p$ under rather general conditions (see \cref{fig:langevin}). That is, if we instead we take $X_0 \sim p' \neq p$, so that $X_t \sim p_t'$, then under mild conditions $p_t \to p$. This fact makes Langevin dynamics extremely useful, and it accordingly serves as the basis for e.g., \textbf{molecular dynamics} simulations, and many other Markov chain Monte Carlo (MCMC) methods across Bayesian statistics and the natural sciences.
+
+与许多马尔可夫链一样，这些动力学在相当一般的条件下会收敛到平稳分布 $p$（见 \cref{fig:langevin}）。也就是说，如果我们取 $X_0 \sim p' \neq p$，使得 $X_t \sim p_t'$，那么在温和条件下 $p_t \to p$。这一事实使得朗之万动力学极其有用，因此它作为例如\textbf{分子动力学}模拟以及贝叶斯统计和自然科学中许多其他马尔可夫链蒙特卡罗（MCMC）方法的基础。
 \end{remarkbox}
 
 Let us summarize the results of this section.

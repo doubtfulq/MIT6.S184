@@ -1,11 +1,11 @@
-\section{Building an Image Generator}
+\section{Building an Image Generator\\构建图像生成器}
 \label{sec:image_generation}
 
 In the previous sections, we learned how to train a flow matching or diffusion model to sample from a distribution $\pdata(x)$. This recipe is general and can be applied to a variety of different data types and applications. In this section, we learn how to apply this framework to build an image or video generator, such as e.g., \themeit{Stable Diffusion 3} and \themeit{Meta Movie Gen Video}. To build such a model, there are two main ingredients that we are missing: First, we will need to formulate \themebf{conditional generation} (\themebf{guidance}), e.g. how do we generate an image that fits a specific text prompt, and how our existing objectives may be suitably adapted to this end. We will also learn about classifier-free guidance, a popular technique used to enhance the quality of conditional generation. Second, we will discuss common neural network architectures, again focusing on those designed for images and videos. Finally, we will examine in depth the two state-of-the-art image and video models mentioned above - \themeit{Stable Diffusion} and \themeit{Meta MovieGen} - to give you a taste of how things are done at scale.
 
 在前面的章节中，我们学习了如何训练流匹配或扩散模型来从分布$\pdata(x)$中采样。这个方法是通用的，可以应用于各种不同的数据类型和应用。在本节中，我们学习如何应用这个框架来构建图像或视频生成器，例如\themeit{Stable Diffusion 3}和\themeit{Meta Movie Gen Video}。要构建这样的模型，我们缺少两个主要组成部分：首先，我们需要制定\themebf{条件生成}（\themebf{指导}），例如如何生成符合特定文本提示的图像，以及如何适当调整我们现有的目标函数来实现这一目标。我们还将学习无分类器指导，这是一种用于提高条件生成质量的流行技术。其次，我们将讨论常用的神经网络架构，重点关注那些为图像和视频设计的架构。最后，我们将深入研究上述两个最先进的图像和视频模型——\themeit{Stable Diffusion}和\themeit{Meta MovieGen}——让您体验大规模实现的方式。
 
-\subsection{Guidance}
+\subsection{Guidance\\引导}
 
 So far, the generative models we considered were \themebf{unconditional}, e.g. an image model would simply generate \themeit{some} image. However, the task is not merely to generate an arbitrary object, but to generate an object \textbf{\sffamily conditioned on some additional information}. For example, one might imagine a generative model for images which takes in a text prompt $y$, and then generates an image $x$ \textbf{\sffamily conditioned} on $y$. For fixed prompt $y$, we would thus like to sample from $\pdata(x|y)$, that is, the data distribution \textbf{\sffamily conditioned on $y$}. Formally, we think of $y$ to live in a space $\mathcal{Y}$. When $y$ corresponds to a text-prompt, for example, $\mathcal{Y}$ would likely be some continuous space like $\mathbb{R}^{d_y}$. When $y$ corresponds to some discrete class label, $\mathcal{Y}$ would be discrete. In the lab, we will work with the MNIST dataset, in which case we will take $\mathcal{Y} = \{0,1,\dots,9\}$ to correspond to the identities of handwritten digits.\\
 
@@ -14,10 +14,8 @@ So far, the generative models we considered were \themebf{unconditional}, e.g. a
 To avoid a notation and terminology clash with the use of the word "\text{conditional}" to refer to conditioning on $z \sim \pdata$ (conditional probability path/vector field), we will make use of the term \themebf{guided} to refer specifically to conditioning on $y$.
 
 为了避免使用词汇"\text{conditional}"来指代基于$z \sim \pdata$的条件化（条件概率路径/向量场）时产生的符号和术语冲突，我们将使用术语\themebf{guided}来专门指代基于$y$的条件化。
-\begin{remarkbox}[Guided vs. Conditional Terminology]
-    In these notes, we opt to use the term \themebf{guided} in place of \themebf{conditional} to refer to the act of conditioning on $y$. Here, we will refer to e.g., a \themebf{guided} vector field $\uref_t(x|y)$ and a \themebf{conditional} vector field $\uref_t(x|z)$. This terminology is consistent with other works such as \cite{lipman2024flow}. 
-\end{remarkbox}
-\begin{remarkbox}[引导 vs. 条件 术语]
+\begin{remarkbox}[Guided vs. Conditional Terminology/引导 vs. 条件 术语]
+    In these notes, we opt to use the term \themebf{guided} in place of \themebf{conditional} to refer to the act of conditioning on $y$. Here, we will refer to e.g., a \themebf{guided} vector field $\uref_t(x|y)$ and a \themebf{conditional} vector field $\uref_t(x|z)$. This terminology is consistent with other works such as \cite{lipman2024flow}. \\
     在这些笔记中，我们选择使用术语\themebf{guided}（引导）来代替\themebf{conditional}（条件）来指代基于$y$的条件化行为。在这里，我们将引用，例如，一个\themebf{guided}（引导）向量场$\uref_t(x|y)$和一个\themebf{conditional}（条件）向量场$\uref_t(x|z)$。这种术语与其他工作一致，如\cite{lipman2024flow}。
 \end{remarkbox}
 
@@ -38,9 +36,7 @@ Notice the difference from summary \ref{summary:diffusion_model}: we are additio
     \textbf{\sffamily Goal:}\quad X_1 &\sim  \pdata(\cdot | y) \quad &&\blacktriangleright\,\,\text{Goal is for $X_1$ to be distributed like $\pdata(\cdot|y)$.}
 \end{align*}
 When $\sigma_t = 0$, we say that such a model is a \themebf{guided flow model}.
-\end{ideabox}
 
-\begin{ideabox}[引导生成模型]
 我们定义一个\themebf{引导扩散模型}由一个\themebf{引导向量场}$u_t^{\theta}(\cdot | y)$（由某个神经网络参数化）和一个时间相关的扩散系数$\sigma_t$组成，它们一起给出：
 \begin{align*}
     \textbf{\sffamily 神经网络:}&\, u^\theta: \mathbb{R}^d \times \mathcal{Y} \times [0,1] \to \mathbb{R}^d,\,\, (x,y,t) \mapsto u_t^{\theta}(x|y)\\
@@ -55,6 +51,7 @@ When $\sigma_t = 0$, we say that such a model is a \themebf{guided flow model}.
 当$\sigma_t = 0$时，我们称这样的模型为\themebf{引导流模型}。
 \end{ideabox}
 
+
 \subsubsection{Guidance for Flow Models}
 If we imagine fixing our choice of $y$, and take our data distribution as $p_{\text{data}}(x|y)$, then we have recovered the unguided generative problem, and can accordingly construct a generative model using the conditional flow matching objective, viz.,
 \begin{equation}
@@ -68,7 +65,8 @@ Expanding the expectation over all such choices of $y$, and over all times $t \i
 \end{equation}
 One of the main differences between the guided objective in \cref{eq:guided_cfm} and the unguided objective from \cref{eq:cfm} is that here we are sampling $(z,y) \sim \pdata$ rather than just $z \sim \pdata$. The reason is that our data distribution is now, in principle, a joint distribution over e.g., both images $z$ and text prompts $y$. In practice, this means that a PyTorch implementation of \cref{eq:guided_cfm} would involve a dataloader which returned batches of \textbf{both $z$ and $y$}. The above procedure leads to a faithful generation procedure of $\pdata(\cdot|y)$.
 
-\subsubsection{流模型的指导}
+流模型的指导
+
 如果我们想象固定我们对$y$的选择，并将我们的数据分布取为$p_{\text{data}}(x|y)$，那么我们已经恢复了无指导生成问题，并且可以相应地使用条件流匹配目标构建生成模型，即：
 \begin{equation}
     \mathbb{E}_{z \sim p_{\text{data}}(\cdot|y), x \sim p_t(\cdot|z)} \lVert u_t^{\theta}(x|y) - \uref_t(x|z)\rVert^2.
@@ -149,10 +147,9 @@ where $w > 1$ is known as the \themebf{guidance scale}. Note that this is a heur
     \tilde{u}_t(x|y) = \uref_t(x) + w b_t \nabla \log p_t(y|x),
 \end{align*}
 其中$w > 1$被称为\themebf{指导尺度}。注意这是一个启发式方法：对于$w \neq 1$，有$\tilde{u}_t(x|y) \neq \uref_t(x|y)$，即因此不是真正的引导向量场。然而，经验结果表明（当$w > 1$时）能产生更好的结果。 
-\begin{remarkbox}[Where is the classifier?]
+\begin{remarkbox}[Where is the classifier?/分类器在哪里？]
 The term $\log p_t(y|x)$ can be considered as a sort of classifier of noised data (i.e. it gives the likelihoods of $y$ given $x$). In fact, early works in diffusion trained actual classifiers and used them to the guide via the above procedure. This leads to \themebf{classifier guidance} \cite{classifier_guidance, yangsong_sde}. As it has been largely superseded by classifier-free guidance, we do not consider it here. 
-\end{remarkbox}
-\begin{remarkbox}[分类器在哪里？]
+
 项$\log p_t(y|x)$可以被视为一种对噪声数据的分类器（即它给出了给定$x$时$y$的似然）。实际上，扩散的早期工作训练了实际的分类器，并通过上述程序使用它们进行指导。这导致了\themebf{分类器指导}\cite{classifier_guidance, yangsong_sde}。由于它已被无分类器指导在很大程度上取代，我们在这里不予考虑。
 \end{remarkbox}
 
@@ -170,14 +167,13 @@ We may therefore express the scaled guided vector field $\tilde{u}_t(x|y)$ as th
 &= (1-w) \uref_t(x) + w \uref_t(x|y).\end{align*}
 因此，我们可以将缩放的引导向量场$\tilde{u}_t(x|y)$表达为无引导向量场$\uref_t(x)$与引导向量场$\uref_t(x|y)$的线性组合。那么想法可能是既训练无引导的$\uref_t(x)$（例如使用\cref{eq:cfm}）也训练引导的$\uref_t(x|y)$（例如使用\cref{eq:guided_cfm}），然后在推理时将它们组合以获得$\tilde{u}_t(x|y)$。"但是等等！"，你可能会问，"那我们不就需要训练两个模型了！？"。事实证明我们可以在一个模型中训练两者：我们可以用一个新的、额外的$\varnothing$标签来增强我们的标签集，该标签表示\textbf{缺乏条件化}。然后我们可以将$\uref_t(x)=\uref_t(x|\varnothing)$。有了这个，我们不需要训练一个单独的模型来强化假设分类器的效果。这种在一个模型中训练条件和无条件模型（并随后强化条件化）的方法被称为\themebf{无分类器指导}（CFG）\cite{cfg}。 
 
-\begin{remarkbox}[Derivation for general probability paths]
+\begin{remarkbox}[Derivation for general probability paths/一般概率路径的推导]
 Note that the construction
 \begin{equation*}
     \tilde{u}_t(x|y) = (1-w) \uref_t(x) + w \uref_t(x|y),
 \end{equation*}
 is equally valid for any choice probability path, not just a Gaussian one. When $w=1$, it is straightforward to verify that $\tilde{u}_t(x|y)=\uref_t(x|y)$. Our derivation using Gaussian paths was simply to illustrate the intuition behind the construction, and in particular of amplifying the contribution of a ``classifier'' $\nabla \log p_t(y|x)$.
-\end{remarkbox}
-\begin{remarkbox}[一般概率路径的推导]
+
 注意构造
 \begin{equation*}
     \tilde{u}_t(x|y) = (1-w) \uref_t(x) + w \uref_t(x|y),
@@ -201,7 +197,7 @@ We summarize our findings below.
 
 我们在下面总结我们的发现。
 
-\begin{summarybox}[Classifier-Free Guidance for Flow Models]
+\begin{summarybox}[Classifier-Free Guidance for Flow Models/流模型的无分类器指导]
 Given the unguided marginal vector field $\uref_t(x|\varnothing)$, the guided marginal vector field $\uref_t(x|y)$, and a \themebf{guidance scale} $w > 1$, we define the \themebf{classifier-free guided vector field} $\tilde{u}_t(x|y)$ by 
 \begin{equation}
     \tilde{u}_t(x|y) = (1-w) \uref_t(x|\varnothing) + w \uref_t(x|y).
@@ -227,9 +223,7 @@ Above, we made use multiple times of the fact that $\uref_t(x|z) = \uref_t(x|z,y
     \textbf{\sffamily Simulation:}\quad \dd X_t &= \tilde{u}_t^\theta(X_t|y)\dd t \quad && \blacktriangleright\,\,\text{Simulate ODE from $t=0$ to $t=1$.}\\
     \textbf{\sffamily Samples:}\quad X_1& \quad && \blacktriangleright\,\,\text{Goal is for $X_1$ to adhere to the guiding variable $y$.}
 \end{alignat*}
-\end{summarybox}
 
-\begin{summarybox}[流模型的无分类器指导]
 给定无引导边际向量场$\uref_t(x|\varnothing)$、引导边际向量场$\uref_t(x|y)$和\themebf{指导尺度}$w > 1$，我们通过以下方式定义\themebf{无分类器引导向量场}$\tilde{u}_t(x|y)$：
 \begin{equation}
     \tilde{u}_t(x|y) = (1-w) \uref_t(x|\varnothing) + w \uref_t(x|y).
@@ -263,13 +257,14 @@ Note that the distribution of $X_1$ is not necessarily aligned with $X_1 \sim  \
 \begin{figure}[!t]
     \centering
     \includegraphics[width=\linewidth]{figures/salimans_cfg.png}
-    \caption{The effect of classifier guidance. The prompt here is the "class" chosen to be "Corgi" (a specific type of dog). Left: samples generated with no guidance (i.e., $w = 1$). Right: samples generated with classifier guidance and $w = 4$. As shown, classifier-free guidance improves the similarity to the prompt. Figure taken from \cite{cfg}.}
+    \caption{The effect of classifier guidance. The prompt here is the "class" chosen to be "Corgi" (a specific type of dog). Left: samples generated with no guidance (i.e., $w = 1$). Right: samples generated with classifier guidance and $w = 4$. As shown, classifier-free guidance improves the similarity to the prompt. Figure taken from \cite{cfg}.分类器指导的效果。这里的提示是选择的"类别"为"柯基犬"（一种特定类型的狗）。左：无指导生成的样本（即$w = 1$）。右：使用分类器指导且$w = 4$生成的样本。如图所示，无分类器指导提高了与提示的相似性。图片来自\cite{cfg}。}
     \label{fig:guidance}
 \end{figure}
+
 \begin{figure}[!t]
     \centering
     \includegraphics[width=\linewidth]{figures/guidance.png}
-    \caption{The effect of classifier-free guidance applied at various guidance scales for the MNIST dataset of hand-written digits. Left: Guidance scale set to $w = 1.0$. Middle: Guidance scale set to $w = 2.0$. Right: Guidance scale set to $w = 4.0$. You will generate a similar image yourself in the lab three!}
+    \caption{The effect of classifier-free guidance applied at various guidance scales for the MNIST dataset of hand-written digits. Left: Guidance scale set to $w = 1.0$. Middle: Guidance scale set to $w = 2.0$. Right: Guidance scale set to $w = 4.0$. You will generate a similar image yourself in the lab three!无分类器指导在不同指导尺度下应用于MNIST手写数字数据集的效果。左：指导尺度设置为$w = 1.0$。中：指导尺度设置为$w = 2.0$。右：指导尺度设置为$w = 4.0$。你将在第三个实验中自己生成类似的图像！}
     \label{fig:mnist_guidance}
 \end{figure}
 In \cref{fig:guidance}, we illustrate class-based classifier-free guidance on 128x128 ImageNet, as in \cite{cfg}. Similarly, in \cref{fig:mnist_guidance}, we visualize the affect of various guidance scales $w$ when applying classifier-free guidance to sampling from the MNIST dataset of handwritten digits.
@@ -296,7 +291,7 @@ In \cref{fig:guidance}, we illustrate class-based classifier-free guidance on 12
 \end{algorithmic}
 \end{algorithm}
 
-\subsubsection{Guidance for Diffusion Models}
+\subsubsection{Guidance for Diffusion Models/扩散模型的指导}
 In this section we extend the reasoning of the previous section to diffusion models. First, in the same way that we obtained \cref{eq:guided_cfm}, we may generalize the conditional score matching loss \cref{eq:dsm} to obtain the \themebf{guided conditional score matching objective}
 \begin{align}
     \label{eq:guided_dsm}
@@ -308,7 +303,8 @@ A guided score network $s_t^\theta(x|y)$ trained with \cref{eq:guided_dsm} might
     X_0 \sim \pinit,\quad \dd X_t = \left[u_t^\theta(X_t|y)+\frac{\sigma_t^2}{2}s_t^\theta(X_t|y)\right]\dd t + \sigma_t\dd W_t.
 \end{equation*}
 
-\subsubsection{扩散模型的指导}
+扩散模型的指导
+
 在本节中，我们将前一节的推理扩展到扩散模型。首先，与我们获得\cref{eq:guided_cfm}的方式相同，我们可以将条件评分匹配损失\cref{eq:dsm}推广以获得\themebf{引导条件评分匹配目标}
 \begin{align}
     \label{eq:guided_dsm}
@@ -344,6 +340,8 @@ so that for \themebf{guidance scale} $w > 1$ we may define
                     &= (1-w) \nabla \log p_t(x|\varnothing) + w \nabla \log p_t(x|y)
 \end{align*}
 We thus arrive at the CFG-compatible (that is, accounting for the possibility of $\varnothing$) objective 
+
+因此我们得到了CFG兼容的（即考虑$\varnothing$可能性的）目标函数 
 \begin{align}
     \label{eq:cfg_guided_dsm}
     \mathcal{L}_{\text{DSM}}^{\text{CFG}}(\theta) &= \,\,\mathbb{E}_{\square} \lVert s_t^{\theta}(x|y) - \nabla \log p_t(x|z)\rVert^2\\
@@ -353,7 +351,7 @@ where $\eta$ is a hyperparameter (the probability of replacing $y$ with $\varnot
 
 其中$\eta$是一个超参数（用$\varnothing$替换$y$的概率）。我们将$\mathcal{L}_{\text{CSM}}^{\text{CFG}}(\theta)$称为\themebf{引导条件评分匹配目标}。我们总结如下
 
-\begin{summarybox}[Classifier-Free Guidance for Diffusions]
+\begin{summarybox}[Classifier-Free Guidance for Diffusions/扩散的无分类器指导]
 Given the unguided marginal score $\nabla \log p_t(x|\varnothing)$, the guided marginal score field $\nabla \log p_t(x|y)$, and a \themebf{guidance scale} $w > 1$, we define the \themebf{classifier-free guided score} $\tilde{s}_t(x|y)$ by 
 \begin{equation}
     \tilde{s}_t(x|y) = (1-w) \nabla \log p_t(x|\varnothing) + w \nabla \log p_t(x|y).
@@ -384,9 +382,7 @@ Then we may sample via
     \textbf{\sffamily Simulation:}\quad \dd X_t &= \left[\tilde{u}_t^\theta(X_t|y)+\frac{\sigma_t^2}{2}\tilde{s}_t^\theta(X_t|y)\right]\dd t + \sigma_t\dd W_t \quad && \blacktriangleright\,\,\text{Simulate SDE from $t=0$ to $t=1$.}\\
     \textbf{\sffamily Samples:}\quad X_1& \quad && \blacktriangleright\,\,\text{Goal is for $X_1$ to adhere to the guiding variable $y$.}
 \end{alignat*}
-\end{summarybox}
 
-\begin{summarybox}[扩散的无分类器指导]
 给定无指导边际评分$\nabla \log p_t(x|\varnothing)$、引导边际评分场$\nabla \log p_t(x|y)$和\themebf{指导尺度}$w > 1$，我们通过以下方式定义\themebf{无分类器引导评分}$\tilde{s}_t(x|y)$
 \begin{equation}
     \tilde{s}_t(x|y) = (1-w) \nabla \log p_t(x|\varnothing) + w \nabla \log p_t(x|y).
@@ -449,16 +445,10 @@ Notice that as the input passes through the encoders, the number of channels in 
 \begin{figure}
     \centering
     \includegraphics[width=\textwidth]{figures/unet.png}
-    \caption{The simplified U-Net architecture used in lab three.}
+    \caption{The simplified U-Net architecture used in lab three./实验三中使用的简化U-Net架构。}
     \label{fig:unet}
 \end{figure}
 
-\begin{figure}
-    \centering
-    \includegraphics[width=\textwidth]{figures/unet.png}
-    \caption{实验三中使用的简化U-Net架构。}
-    \label{fig:unet}
-\end{figure}
 
 At a high level, most U-Nets involve some variant of what is described above. However, certain of the design choices described above may well differ from various implementations in practice. In particular, we opt above for a purely-convolutional architecture whereas it is common to include attention layers as well throughout the encoders and decoders. The U-Net derives its name from the ``U''-like shape formed by its encoders and decoders (see \cref{fig:unet}).
 
@@ -468,13 +458,12 @@ At a high level, most U-Nets involve some variant of what is described above. Ho
 
 \paragraph{扩散变换器。} U-Net的一种替代方案是\themebf{扩散变换器}（DiT），它们摒弃了卷积，纯粹使用\themebf{注意力}\cite{attention, dit}。扩散变换器基于\themebf{视觉变换器}（ViT），其中的主要思想本质上是将图像分割成补丁，嵌入每个补丁，然后在补丁之间进行注意力计算\cite{vit}。用条件流匹配训练的\themeit{Stable Diffusion 3}将速度场$u_t^{\theta}(x)$参数化为修改的DiT，我们稍后在\cref{sec:large_scale_models}中讨论\cite{sd3}。
 
-\begin{remarkbox}[Working in Latent Space]
+\begin{remarkbox}[Working in Latent Space/在潜在空间中工作]
 A common problem for large-scale applications is that the data is so high-dimensional that it consumes too much memory. For example, we might want to generate a high resolution image of $1000\times 10000$ pixels leading to $1$ million (!) dimensions. To reduce memory usage, a common design pattern is to work in a \themebf{latent space} that can be considered a compressed version of our data at lower resolution.  Specifically, the usual approach is to combine a flow or diffusion model with a (variational) \themebf{autoencoder} \cite{latent_diffusion}. In this case, one first encodes the training dataset in the \themebf{latent space} via an autoencoder, and then training the flow or diffusion model in the latent space. Sampling is performed by first sampling in the latent space using the trained flow or diffusion model, and then decoding of the output via the decoder. Intuitively, a well-trained autoencoder can be thought of as filtering out semantically meaningless details, allowing the generative model to ``focus'' on important, perceptually relevant features \cite{latent_diffusion}. By now, nearly all state-of-the-art approaches to image and video generation involve training a flow or diffusion model in the latent space of an autoencoder - so called \themebf{latent diffusion models} \citep{latent_diffusion,vahdat2021score}. However, it is important to note: one also needs to train the autoencoder before training the diffusion models. Crucially, performance now depends also on how good the autoencoder compresses images into latent space and recovers aesthetically pleasing images.
-\end{remarkbox}
 
-\begin{remarkbox}[在潜在空间中工作]
 大规模应用的一个常见问题是数据的维度太高，消耗太多内存。例如，我们可能想要生成$1000\times 10000$像素的高分辨率图像，导致$1$百万（！）维度。为了减少内存使用，一种常见的设计模式是在\themebf{潜在空间}中工作，该空间可以被视为我们在较低分辨率下的数据的压缩版本。具体而言，通常的方法是将流模型或扩散模型与（变分）\themebf{自编码器}结合\cite{latent_diffusion}。在这种情况下，首先通过自编码器在\themebf{潜在空间}中编码训练数据集，然后在潜在空间中训练流模型或扩散模型。采样通过首先使用训练的流模型或扩散模型在潜在空间中采样，然后通过解码器解码输出来执行。直观地，一个训练良好的自编码器可以被认为是过滤掉语义上无意义的细节，允许生成模型"专注"于重要的、感知相关的特征\cite{latent_diffusion}。到现在，几乎所有最先进的图像和视频生成方法都涉及在自编码器的潜在空间中训练流模型或扩散模型——所谓的\themebf{潜在扩散模型}\citep{latent_diffusion,vahdat2021score}。然而，重要的是要注意：在训练扩散模型之前，还需要训练自编码器。关键的是，性能现在也取决于自编码器将图像压缩到潜在空间并恢复美观图像的效果如何。
 \end{remarkbox}
+
 \subsubsection{Encoding the Guiding Variable.} 
 Up until this point, we have glossed over how exactly the guiding (conditioning) variable $y$ is fed into the neural network $u_t^\theta(x|y)$. Broadly, this process can be decomposed into two steps: embedding the raw input $y_{\text{raw}}$ (e.g., the text prompt ``a cat playing a trumpet, photorealistic'') into some vector-valued input $y$, and feeding the resulting $y$ into the actual model. We now proceed to describe each step in greater detail.
 
@@ -496,25 +485,10 @@ Up until this point, we have glossed over how exactly the guiding (conditioning)
   \includegraphics[width=0.95\linewidth]{figures/clip.png}
   \label{fig:sub2}
 \end{subfigure}
-\caption{Left: An overview of the diffusion transformer architecture, taken from \cite{dit}. Right: A schematic of the contrastive CLIP loss, in which a shared image-text embedding space is learned, taken from \cite{clip}.}
+\caption{Left: An overview of the diffusion transformer architecture, taken from \cite{dit}. Right: A schematic of the contrastive CLIP loss, in which a shared image-text embedding space is learned, taken from \cite{clip}.左：扩散变换器架构概述，取自\cite{dit}。右：对比CLIP损失示意图，其中学习了共享图像-文本嵌入空间，取自\cite{clip}。}
 \label{fig:test}
 \end{figure}
 
-\begin{figure}[!t]
-\centering
-\begin{subfigure}{.5\textwidth}
-  \centering
-  \includegraphics[width=0.95\linewidth]{figures/dit.png}
-  \label{fig:sub1}
-\end{subfigure}%
-\begin{subfigure}{.5\textwidth}
-  \centering
-  \includegraphics[width=0.95\linewidth]{figures/clip.png}
-  \label{fig:sub2}
-\end{subfigure}
-\caption{左：扩散变换器架构概述，取自\cite{dit}。右：对比CLIP损失示意图，其中学习了共享图像-文本嵌入空间，取自\cite{clip}。}
-\label{fig:test}
-\end{figure}
 
 \paragraph{Feeding in the Embedding.} Suppose now that we have obtained our embedding vector $y \in \mathbb{R}^{d_y}$. Now what? The answer varies, but usually it is some variant of the following: feed it individually into every sub-component of the architecture for images. Let us briefly describe how this is accomplished in the U-Net implementation used in lab three, as depicted in \cref{fig:unet}. At some intermediate point within the network, we would like to inject information from $y \in \mathbb{R}^{d_y}$ into the current activation $x^{\text{intermediate}}_t \in \mathbb{R}^{C \times H \times W}$. We might do so using the procedure below, given in PyTorch-esque pseudocode.
 
@@ -542,15 +516,17 @@ One exception to this simple-pointwise conditioning scheme is when we have a seq
 
 \subsection{A Survey of Large-Scale Image and Video Models}
 
-\subsection{大规模图像和视频模型调研}
 \label{sec:large_scale_models}
 We conclude this section by briefly examining two large-scale generative models: \themeit{Stable Diffusion 3} for image generation and Meta's \themeit{Movie Gen Video} for video generation \citep{sd3, moviegen}. As you will see, these models use the techniques we have described in this work along with additional architectural enhancements to both scale and accommodate richly structured conditioning modalities, such as text-based input.
+
+大规模图像和视频模型调研
+
+我们通过简要研究两个大规模生成模型来结束本节：用于图像生成的\themeit{Stable Diffusion 3}和Meta的用于视频生成的\themeit{Movie Gen Video} \citep{sd3, moviegen}。正如您将看到的，这些模型使用了我们在本工作中描述的技术，同时还增加了额外的架构增强功能，以便扩展和适应丰富结构化的条件模态，如基于文本的输入。
 
 \subsubsection{Stable Diffusion 3}
 
 Stable Diffusion is a series of state-of-the-art image generation models. These models were among the first to use large-scale latent diffusion models for image generation. If you have not done so, we highly recommend testing it for yourself online (\url{https://stability.ai/news/stable-diffusion-3}).\\
 
-\subsubsection{Stable Diffusion 3}
 
 Stable Diffusion是一系列最先进的图像生成模型。这些模型是首批使用大规模潜在扩散模型进行图像生成的模型之一。如果您还没有这样做，我们强烈建议您在线亲自测试（\url{https://stability.ai/news/stable-diffusion-3}）。\\
 
@@ -580,23 +556,16 @@ To enhance text conditioning, Stable Diffusion 3 makes use of both 3 different t
 \begin{figure}[!t]
     \centering
     \includegraphics[width=0.9\textwidth]{figures/mmdit.png}
-    \caption{The architecture of the multi-modal diffusion transformer (MM-DiT) proposed in \citep{sd3}. Figure also taken from \citep{sd3}.}
+    \caption{The architecture of the multi-modal diffusion transformer (MM-DiT) proposed in \citep{sd3}. Figure also taken from \citep{sd3}.\citep{sd3}中提出的多模态扩散变换器（MM-DiT）的架构。图也取自\citep{sd3}。}
     \label{fig:mmdit}
 \end{figure}
 
-\begin{figure}[!t]
-    \centering
-    \includegraphics[width=0.9\textwidth]{figures/mmdit.png}
-    \caption{\citep{sd3}中提出的多模态扩散变换器（MM-DiT）的架构。图也取自\citep{sd3}。}
-    \label{fig:mmdit}
-\end{figure}
 
 %\paragraph{Architecture.}
 
 \subsubsection{Meta Movie Gen Video}
 Next, we discuss Meta's video generator, \themeit{Movie Gen Video} (\url{https://ai.meta.com/research/movie-gen/}). As the data are not images but \themeit{videos},  the data $x$ lie in the space $\mathbb{R}^{T \times C \times H \times W}$ where $T$ represents the new \themebf{temporal} dimension (i.e. the number of frames). As we shall see, many of the design choices made in this video setting can be seen as adapting existing techniques (e.g., autoencoders, diffusion transformers, etc.) from the image setting to handle this extra temporal dimension.\\
 
-\subsubsection{Meta Movie Gen Video}
 接下来，我们讨论Meta的视频生成器\themeit{Movie Gen Video}（\url{https://ai.meta.com/research/movie-gen/}）。由于数据不是图像而是\themeit{视频}，数据$x$位于空间$\mathbb{R}^{T \times C \times H \times W}$中，其中$T$表示新的\themebf{时间}维度（即帧数）。正如我们将看到的，在这种视频设置中做出的许多设计选择可以被视为将现有技术（例如自编码器、扩散变换器等）从图像设置适应到处理这个额外的时间维度。\\
 
 Movie Gen Video utilizes the conditional flow matching objective with the same CondOT path (see \cref{alg:training_fm_score_matching_gaussian_paths}). Like Stable Diffusion 3, Movie Gen Video also operates in the latent space of frozen, pretrained autoencoder. Note that the autoencoder to reduce memory consumption is even more important for videos than for images - which is why most video generators right now are pretty limited in the length of the video they generate.
