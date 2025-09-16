@@ -303,8 +303,6 @@ A guided score network $s_t^\theta(x|y)$ trained with \cref{eq:guided_dsm} might
     X_0 \sim \pinit,\quad \dd X_t = \left[u_t^\theta(X_t|y)+\frac{\sigma_t^2}{2}s_t^\theta(X_t|y)\right]\dd t + \sigma_t\dd W_t.
 \end{equation*}
 
-扩散模型的指导
-%TODO：此处的\cref{eq:dsm}渲染为问号 不过前面发现的很多问号都恢复正常了 不确定这是不是问题
 在本节中，我们将前一节的推理扩展到扩散模型。首先，与我们获得\cref{eq:guided_cfm}的方式相同，我们可以将条件评分匹配损失\cref{eq:dsm}推广以获得\themebf{引导条件评分匹配目标}
 \begin{align}
     \label{eq:guided_dsm}
