@@ -194,7 +194,7 @@ Many famous state-of-the-art models have been trained using this simple yet effe
 \ENDFOR
 \end{algorithmic}
 \end{algorithm}
-
+%TODO:此处英文原文神秘消失
 输入：来自 $\pdata$ 的样本数据集 $z$，神经网络 $u_t^\theta$
 对于每个数据小批次：
     从数据集中采样一个数据样本 $\dap$。
@@ -295,9 +295,21 @@ The above procedure describes the vanilla procedure of training a diffusion mode
 \label{eq:sde_extension_restated}
     X_0\sim&\pinit,\quad \dd X_t =\left[u_t^\theta(X_t)+\frac{\sigma_t^2}{2}s_t^\theta(X_t)\right]\dd t +\sigma_t\dd W_t,
 \end{align}
-to generate samples $X_1\sim\pdata$. In theory, every $\sigma_t$ should give samples $X_1\sim \pdata$ at perfect training. In practice, we encounter two types of errors: (1) numerical errors by simulating the SDE imperfectly and (2) training errors (i.e., the model $u_t^{\theta}$ is not exactly equal to $\uref_t$). Therefore, there is an optimal unknown noise level $\sigma_t$ - this can be determined empirically by just testing our different values of empirically (see e.g. \citep{albergo2023stochastic,karras2022elucidating,ma2024sit}). At first sight, it might seem to be a disadvantage that we have to learn both $s_t^\theta$ and $u_t^\theta$ if we wanted to use diffusion model now as opposed to a flow model. However, note we can often directly $s_t^\theta$ and $u_t^\theta$ in a single network with two outputs, so that the additional computational effort is usually minimal. Further, as we will see now for the special case of the Gaussian probability path, $s_t^\theta$ and $u_t^\theta$ may be converted into one another so that we don't have to train them separately.
+to generate samples $X_1\sim\pdata$. In theory, every $\sigma_t$ should give samples $X_1\sim \pdata$ at perfect training. In practice, we encounter two types of errors: (1) numerical errors by simulating the SDE imperfectly and (2) training errors (i.e., the model $u_t^{\theta}$ is not exactly equal to $\uref_t$). Therefore, there is an optimal unknown noise level $\sigma_t$ - this can be determined empirically by just testing our different values of empirically (see e.g. \citep{albergo2023stochastic,karras2022elucidating,ma2024sit}).
 
-\begin{remarkbox}[Denoising Diffusion Models]If you are familiar with diffusion models, you have probably encountered the term \themebf{\textit{denoising} diffusion model}. This model has become so popular that most people nowadays drop the word "denoising" and simply use the term "diffusion model" to describe it. In the language of this document, these are simply diffusion models with Gaussian probability paths $p_t(\cdot|z)=\mathcal{N}(\alpha_t z;\beta_t^2 I_d)$. However, it is important to note that this might not be immediately obvious if you read some of the first diffusion model papers: they use a different time convention (time is inverted) - so you need apply an appropriate time re-scaling - and they construct their probability path via so-called \textbf{forward processes} (we will discuss this in \cref{subsec:guide_to_flow_matching_literature}).
+生成样本 $X_1\sim\pdata$。理论上，在完美训练的情况下，每个 $\sigma_t$ 都应该生成样本 $X_1\sim \pdata$。实际上，我们会遇到两种类型的误差：（1）通过不完美地模拟 SDE 产生的数值误差，以及（2）训练误差（即模型 $u_t^{\theta}$ 不完全等于 $\uref_t$）。因此，存在一个最优的未知噪声水平 $\sigma_t$ - 这可以通过经验性地测试我们的不同值来确定（例如参见 \citep{albergo2023stochastic,karras2022elucidating,ma2024sit}）。
+
+At first sight, it might seem to be a disadvantage that we have to learn both $s_t^\theta$ and $u_t^\theta$ if we wanted to use diffusion model now as opposed to a flow model. However, note we can often directly $s_t^\theta$ and $u_t^\theta$ in a single network with two outputs, so that the additional computational effort is usually minimal. Further, as we will see now for the special case of the Gaussian probability path, $s_t^\theta$ and $u_t^\theta$ may be converted into one another so that we don't have to train them separately.
+
+乍一看，如果我们现在想要使用扩散模型而不是流模型，我们必须同时学习 $s_t^\theta$ 和 $u_t^\theta$ 似乎是一个缺点。然而，注意我们通常可以在一个具有两个输出的单一网络中直接学习 $s_t^\theta$ 和 $u_t^\theta$，因此额外的计算工作量通常是最小的。此外，正如我们现在将看到的，对于高斯概率路径的特殊情况，$s_t^\theta$ 和 $u_t^\theta$ 可以相互转换，因此我们不必单独训练它们。
+
+\begin{remarkbox}[Denoising Diffusion Models]If you are familiar with diffusion models, you have probably encountered the term \themebf{\textit{denoising} diffusion model}. This model has become so popular that most people nowadays drop the word "denoising" and simply use the term "diffusion model" to describe it. In the language of this document, these are simply diffusion models with Gaussian probability paths $p_t(\cdot|z)=\mathcal{N}(\alpha_t z;\beta_t^2 I_d)$.
+
+如果你熟悉扩散模型，你可能遇到过\themebf{\textit{去噪}扩散模型}这个术语。这种模型已经变得如此流行，以至于现在大多数人都省略了"去噪"一词，而简单地使用"扩散模型"来描述它。在本文档的语言中，这些只是具有高斯概率路径 $p_t(\cdot|z)=\mathcal{N}(\alpha_t z;\beta_t^2 I_d)$ 的扩散模型。
+
+However, it is important to note that this might not be immediately obvious if you read some of the first diffusion model papers: they use a different time convention (time is inverted) - so you need apply an appropriate time re-scaling - and they construct their probability path via so-called \textbf{forward processes} (we will discuss this in \cref{subsec:guide_to_flow_matching_literature}).
+
+然而，需要注意的是，如果你阅读一些早期的扩散模型论文，这一点可能不会立即显而易见：它们使用不同的时间约定（时间是反转的）- 因此你需要应用适当的时间重新缩放 - 并且它们通过所谓的\textbf{前向过程}来构建概率路径（我们将在\cref{subsec:guide_to_flow_matching_literature}中讨论这一点）。
 \end{remarkbox}
 
 \begin{examplebox}[Denoising Diffusion Models: Score Matching for Gaussian Probability Paths]
@@ -335,17 +347,17 @@ As before, the network $\epsilon_t^\theta$ essentially learns to predict the noi
 \end{examplebox}
 
 \begin{algorithm}[h]
-\caption{Score Matching Training Procedure for Gaussian probability path}
+\caption{Score Matching Training Procedure for Gaussian probability path / 高斯概率路径的分数匹配训练过程}
 \label{alg:training_score_matching_gaussian_paths}
 \begin{algorithmic}[1]
-\REQUIRE A dataset of samples $z\sim \pdata$, score network $s_t^\theta$ or noise predictor $\epsilon_t^\theta$
-\FOR{each mini-batch of data}
-    \STATE Sample a data example $\dap$ from the dataset.
-    \STATE Sample a random time $t \sim \text{Unif}_{[0,1]}$.
-    \STATE Sample noise $\epsilon\sim\mathcal{N}(0,I_d)$
-    \STATE Set $x_t=\alpha_t z + \beta_t\epsilon$\hfill (\text{General case: }$x_t\sim p_t(\cdot|z)$)
+\REQUIRE A dataset of samples $z\sim \pdata$, score network $s_t^\theta$ or noise predictor $\epsilon_t^\theta$ / 样本数据集 $z\sim \pdata$，分数网络 $s_t^\theta$ 或噪声预测器 $\epsilon_t^\theta$
+\FOR{each mini-batch of data / 对于每个数据小批量}
+    \STATE Sample a data example $\dap$ from the dataset. / 从数据集中采样一个数据示例 $\dap$。
+    \STATE Sample a random time $t \sim \text{Unif}_{[0,1]}$. / 采样一个随机时间 $t \sim \text{Unif}_{[0,1]}$。
+    \STATE Sample noise $\epsilon\sim\mathcal{N}(0,I_d)$ / 采样噪声 $\epsilon\sim\mathcal{N}(0,I_d)$
+    \STATE Set $x_t=\alpha_t z + \beta_t\epsilon$\hfill (\text{General case: }$x_t\sim p_t(\cdot|z)$) / 设置 $x_t=\alpha_t z + \beta_t\epsilon$\hfill (\text{一般情况: }$x_t\sim p_t(\cdot|z)$)
     %\IF{Flow matching}
-    \STATE Compute loss
+    \STATE Compute loss / 计算损失
     \begin{align*}
         \mathcal{L}(\theta) =& \|s_t^\theta(x_t)+\frac{\epsilon}{\beta_t}\|^2 \quad &(\text{General case: }=\|s_t^\theta(x_t)-\nabla\log p_t(x_t|z)\|^2)\\
     \text{Alternatively: }\mathcal{L}(\theta) =& \|\epsilon_t^\theta(x_t)-\epsilon\|^2
@@ -357,11 +369,11 @@ As before, the network $\epsilon_t^\theta$ essentially learns to predict the noi
     %     \mathcal{L}(\theta) =& \|s_t^\theta(x_t)+\frac{\epsilon}{\beta_t}\|^2 \quad &(\text{General case: }=\|s_t^\theta(x_t)+\nabla\log p_t(x_t|z)\|^2)
     % \end{align*}
     % \ENDIF
-    \STATE Update the model parameters $\theta$ via gradient descent on $\mathcal{L}(\theta)$.
+    \STATE Update the model parameters $\theta$ via gradient descent on $\mathcal{L}(\theta)$. / 通过对 $\mathcal{L}(\theta)$ 进行梯度下降来更新模型参数 $\theta$。
 \ENDFOR
 \end{algorithmic}
 \end{algorithm}
-Beyond its simplicity, there is another useful property of the Gaussian probability path: By learning $s_t^\theta$ or $\epsilon_t^\theta$, we also learn $u_t^\theta$ automatically and the other way around:
+Beyond its simplicity, there is another useful property of the Gaussian probability path: By learning $s_t^\theta$ or $\epsilon_t^\theta$, we also learn $u_t^\theta$ automatically and the other way around: / 除了简单性之外，高斯概率路径还有另一个有用的性质：通过学习 $s_t^\theta$ 或 $\epsilon_t^\theta$，我们也自动学习了 $u_t^\theta$，反之亦然：
 
 除了其简单性之外，高斯概率路径还有另一个有用的性质：通过学习 $s_t^\theta$ 或 $\epsilon_t^\theta$，我们也自动学习了 $u_t^\theta$，反之亦然：
 \begin{proposition}[Conversion formula for Gaussian probability path]
@@ -487,20 +499,40 @@ The idea is that after drawing a data point $z\sim \pdata$ one simulates the for
 \end{align*}
 Note that these are simply Gaussian probability paths. Therefore, one can say that \textbf{a forward process is a specific way of constructing a (Gaussian) probability path.} The term probability path was introduced by flow matching \citep{lipman2022flow} to both simplify the construction and make it more general at the same time: First, the "forward process" of diffusion models is never actually simulated (only samples from $\bar{p}_t(\cdot|z)$ are drawn during training). Second, a forward process only converges for $t\to\infty$ (i.e. we will never arrive at $\pinit$ in finite time). Therefore, we choose to use probability paths in this document.
 
+注意这些只是高斯概率路径。因此，可以说\textbf{前向过程是构建（高斯）概率路径的一种特定方式。}概率路径这个术语由流匹配\citep{lipman2022flow}引入，既简化了构造过程，同时也使其更加通用：首先，扩散模型的"前向过程"实际上从未被模拟（训练期间只从$\bar{p}_t(\cdot|z)$中抽取样本）。其次，前向过程只在$t\to\infty$时收敛（即我们永远不会在有限时间内到达$\pinit$）。因此，我们在本文档中选择使用概率路径。
+
 \paragraph{Time-Reversals vs Solving the Fokker-Planck equation.}
 
+\paragraph{时间反转与求解Fokker-Planck方程。}
+
 The original description of diffusion models did not construct the training target $\uref_t$ or $\nabla\log p_t$ via the Fokker-Planck equation (or Continuity equation) but via a \themebf{time-reversal} of the forward process \citep{anderson1982reverse}. A time-reversal $(X_t)_{0\leq t\leq T}$ is an SDE with the same distribution over trajectories inverted in time, i.e.
+
+扩散模型的原始描述并未通过Fokker-Planck方程（或连续性方程）来构造训练目标$\uref_t$或$\nabla\log p_t$，而是通过前向过程的\themebf{时间反转}\citep{anderson1982reverse}。时间反转$(X_t)_{0\leq t\leq T}$是一个在时间上反转的轨迹上具有相同分布的随机微分方程，即
+
 \begin{align}
 \mathbb{P}[\bar{X}_{t_1}\in A_1,\dots,\bar{X}_{t_n}\in A_n]=\mathbb{P}[X_{T-t_1}\in A_1,\dots,X_{T-t_n}\in A_n]\\
     \text{ for all }0\leq t_1,\dots, t_n\leq T, \text{ and } A_1,\dots,A_n\subset S
 \end{align}
+
 As shown in \citet{anderson1982reverse}, one can obtain a time-reversal satisfying the above condition by the SDE:
+
+如\citet{anderson1982reverse}所示，可以通过以下随机微分方程获得满足上述条件的时间反转：
+
 \begin{align*}
     \dd X_t =& \left[-u_t(X_t)+\sigma_t^2\nabla\log p_t(X_t)\right]\dd t+ \sigma_{t}\dd W_t,\quad u_t(x)=\uforw_{T-t}(x),\sigma_t=\bar{\sigma}_{T-t}
 \end{align*}
+
 As $u_t(X_t)=a_tX_t$, the above corresponds to a specific instance of training target we derived in \cref{prop:conversion_formula_gaussian_prob_path} (this is not immediately trivial as different time conventions are used. See e.g. \citep{lipman2024flow} for a derivation). However, for the purposes of generative modeling, we often only use the final point $X_1$ of the Markov process (e.g., as a generated image) and discard earlier time points. Therefore, whether a Markov process is a ``true'' time-reversal or follows along a probability path does not matter for many applications. Therefore, using a time-reversal is not necessary and often leads to suboptimal results, e.g. the probability flow ODE is often better \citep{karras2022elucidating, ma2024sit}. All ways of sampling from a diffusion models that are different from the time-reversal rely again on using the Fokker-Planck equation. We hope that this illustrates why nowadays many people construct the training targets directly via the Fokker-Planck equation - as pioneered by \citep{lipman2022flow,liu2022flow,albergo2023stochastic} and done in this class.
 
-\paragraph{Flow Matching \citep{lipman2022flow} and Stochastic Interpolants \citep{albergo2023stochastic}.}  The framework that we present is most closely related to the frameworks of flow matching and \themebf{stochastic interpolants (SIs)}. As we learnt, flow matching restricts itself to flows. In fact, one of the key innovations of flow matching was to show that one does not need a construction via a forward process and SDEs but flow models alone can be trained in a scalable manner. Due to this restriction, you should keep in mind that sampling from a flow matching model will be  deterministic (only the initial $X_0\sim \pinit$ will be random). Stochastic interpolants included both the pure flow and the SDE extension via "Langevin dynamics" that we use here (see \cref{thm:langevin_trick}). Stochastic interpolants get their name from a \themebf{interpolant function} $I(t,x,z)$ intended to interpolate between two distributions. In the terminology we use here, this corresponds to a different yet (mainly) equivalent way of constructing a conditional and marginal probability path. The advantage of flow matching and stochastic interpolants over diffusion models is both their simplicity and their generality: their training framework is very simple but at the same time they allow you to go from an arbitrary distribution $\pinit$ to an arbitrary distribution $\pdata$ - while denoising diffusion models only work for Gaussian initial distributions and  Gaussian probability path. This opens up new possibilities for generative modeling that we will touch upon briefly later in this class.
+由于$u_t(X_t)=a_tX_t$，上述对应于我们在\cref{prop:conversion_formula_gaussian_prob_path}中推导的训练目标的一个特定实例（这并不是立即显而易见的，因为使用了不同的时间约定。例如参见\citep{lipman2024flow}的推导）。然而，对于生成建模的目的，我们通常只使用马尔可夫过程的最终点$X_1$（例如，作为生成的图像）并丢弃较早的时间点。因此，对于许多应用而言，马尔可夫过程是否是"真正的"时间反转或沿着概率路径进行并不重要。因此，使用时间反转不是必需的，并且经常导致次优结果，例如概率流ODE通常更好\citep{karras2022elucidating, ma2024sit}。所有不同于时间反转的扩散模型采样方法都再次依赖于使用Fokker-Planck方程。我们希望这说明了为什么现在许多人直接通过Fokker-Planck方程构造训练目标——如\citep{lipman2022flow,liu2022flow,albergo2023stochastic}所开创的，并在本课程中采用。
+
+\paragraph{Flow Matching \citep{lipman2022flow} and Stochastic Interpolants \citep{albergo2023stochastic}.}
+
+\paragraph{流匹配\citep{lipman2022flow}和随机插值\citep{albergo2023stochastic}。}
+
+The framework that we present is most closely related to the frameworks of flow matching and \themebf{stochastic interpolants (SIs)}. As we learnt, flow matching restricts itself to flows. In fact, one of the key innovations of flow matching was to show that one does not need a construction via a forward process and SDEs but flow models alone can be trained in a scalable manner. Due to this restriction, you should keep in mind that sampling from a flow matching model will be  deterministic (only the initial $X_0\sim \pinit$ will be random). Stochastic interpolants included both the pure flow and the SDE extension via "Langevin dynamics" that we use here (see \cref{thm:langevin_trick}). Stochastic interpolants get their name from a \themebf{interpolant function} $I(t,x,z)$ intended to interpolate between two distributions. In the terminology we use here, this corresponds to a different yet (mainly) equivalent way of constructing a conditional and marginal probability path. The advantage of flow matching and stochastic interpolants over diffusion models is both their simplicity and their generality: their training framework is very simple but at the same time they allow you to go from an arbitrary distribution $\pinit$ to an arbitrary distribution $\pdata$ - while denoising diffusion models only work for Gaussian initial distributions and  Gaussian probability path. This opens up new possibilities for generative modeling that we will touch upon briefly later in this class.
+
+我们提出的框架与流匹配和\themebf{随机插值（SIs）}框架最为相关。正如我们所学到的，流匹配限制自己只使用流。实际上，流匹配的关键创新之一是表明不需要通过前向过程和随机微分方程的构造，而是流模型本身就可以以可扩展的方式进行训练。由于这种限制，你应该记住从流匹配模型采样将是确定性的（只有初始$X_0\sim \pinit$是随机的）。随机插值包括了纯流和我们这里使用的通过"朗之万动力学"的随机微分方程扩展（参见\cref{thm:langevin_trick}）。随机插值得名于\themebf{插值函数}$I(t,x,z)$，旨在在两个分布之间进行插值。在我们这里使用的术语中，这对应于构造条件和边际概率路径的一种不同但（主要）等价的方式。流匹配和随机插值相对于扩散模型的优势在于它们的简单性和通用性：它们的训练框架非常简单，同时允许你从任意分布$\pinit$到任意分布$\pdata$——而去噪扩散模型只适用于高斯初始分布和高斯概率路径。这为生成建模开辟了新的可能性，我们将在本课程后面简要涉及。
 
 % Denoising diffusion models use a different time convention: First, they use an \themebf{inverted time convention} where time $t=0$ corresponds $\pdata$ and the distribution for $t\to \infty$ is approximately Gaussian. As we have seen in \cref{subsec:diffusion_reference_construction}, diffusion models construct the probability path via a "forward/noising" process and the time-reversal of that process serves as the reference model. As we have seen, this is an equivalent, less general construction. Personally, I found the difference in this convention to flow matching often very confusing. This is unfortunate but very important to keep in mind.
 

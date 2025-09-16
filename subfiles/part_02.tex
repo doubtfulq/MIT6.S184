@@ -144,19 +144,19 @@ where $\psi_t^\theta$ describes the flow induced by $u_t^\theta$. Note however: 
 \end{align*}
 其中$\psi_t^\theta$描述由$u_t^\theta$诱导的流。但是请注意：尽管它被称为\themeit{流模型}，\textbf{神经网络参数化的是向量场，而不是流}。为了计算流，我们需要模拟ODE。在\cref{alg:sampling_flow_model}中，我们总结了如何从流模型采样的过程。
 
-\begin{algorithm}[h]
-\caption{Sampling from a Flow Model with Euler method}
+\begin{algorithm}[h]%TODO:这部分的中文翻译没有显示
+\caption{Sampling from a Flow Model with Euler method / 使用欧拉方法从流模型中采样}
 \label{alg:sampling_flow_model}
 \begin{algorithmic}[1]
-\REQUIRE Neural network vector field $u_t^\theta$, number of steps $n$
-\STATE Set $t=0$
-\STATE Set step size $h=\frac{1}{n}$
-\STATE Draw a sample $X_0\sim \pinit$
-\FOR{$i=1,\dots,n-1$}
-    \STATE $X_{t+h} = X_{t} + h u_t^\theta(X_t)$
-    \STATE Update $t\leftarrow t+h$
+\REQUIRE Neural network vector field $u_t^\theta$, number of steps $n$ / 神经网络向量场 $u_t^\theta$，步数 $n$
+\STATE Set $t=0$ / 设置 $t=0$
+\STATE Set step size $h=\frac{1}{n}$ / 设置步长 $h=\frac{1}{n}$
+\STATE Draw a sample $X_0\sim \pinit$ / 从 $\pinit$ 中抽取样本 $X_0$
+\FOR{$i=1,\dots,n-1$ / 对于 $i=1,\dots,n-1$}
+    \STATE $X_{t+h} = X_{t} + h u_t^\theta(X_t)$ / $X_{t+h} = X_{t} + h u_t^\theta(X_t)$
+    \STATE Update $t\leftarrow t+h$ / 更新 $t\leftarrow t+h$
 \ENDFOR
-\RETURN $X_1$
+\RETURN $X_1$ / 返回 $X_1$
 \end{algorithmic}
 \end{algorithm}
 
@@ -236,7 +236,7 @@ In \cref{fig:brownian_motion_trajectories}, we plot a few example trajectories o
          % % \includegraphics[width=0.22\textwidth]{assets/flow_velocity/flow_v_14.png} &
          % \includegraphics[width=0.3\textwidth]{fm_guide_assets/flow_16.png} 
     \end{tabular}
-    \caption{\label{fig:bm_ou_process} Illustration of Ornstein-Uhlenbeck processes (\cref{eq:ohrstein_uhlenbeck_process}) in dimension $d=1$ for $\theta=0.25$ and various choices of $\sigma$ (increasing from left to right). For $\sigma=0$, we recover a flow (smooth, deterministic trajectories) that converges to the origin as $t \to \infty$. For $\sigma>0$ we have random paths which converge towards the Gaussian $\mathcal{N}(0,\frac{\sigma^2}{2\theta})$ as $t\to\infty$.}
+    \caption{\label{fig:bm_ou_process} Illustration of Ornstein-Uhlenbeck processes (\cref{eq:ohrstein_uhlenbeck_process}) in dimension $d=1$ for $\theta=0.25$ and various choices of $\sigma$ (increasing from left to right). For $\sigma=0$, we recover a flow (smooth, deterministic trajectories) that converges to the origin as $t \to \infty$. For $\sigma>0$ we have random paths which converge towards the Gaussian $\mathcal{N}(0,\frac{\sigma^2}{2\theta})$ as $t\to\infty$. / Ornstein-Uhlenbeck过程(\cref{eq:ohrstein_uhlenbeck_process})在维度$d=1$下的图示，其中$\theta=0.25$和各种$\sigma$选择（从左到右递增）。当$\sigma=0$时，我们恢复了一个流（平滑、确定性轨迹），当$t \to \infty$时收敛到原点。当$\sigma>0$时，我们有随机路径，当$t\to\infty$时收敛到高斯分布$\mathcal{N}(0,\frac{\sigma^2}{2\theta})$。}
 \end{figure} 
 
 \paragraph{From ODEs to SDEs.} The idea of an SDE is to extend the deterministic dynamics of an ODE by adding stochastic dynamics driven by a Brownian motion. Because everything is stochastic, we may no longer take the derivative as in \cref{e:ode_ode}. Hence, we need to find an \textbf{equivalent formulation of ODEs that does not use derivatives}. For this, let us therefore rewrite trajectories $(X_t)_{0\leq t\leq 1}$ of an ODE as follows:
@@ -362,7 +362,6 @@ To obtain samples from our SDE model (i.e. generate objects), the procedure is a
 \end{align*}
 A diffusion model with $\sigma_t=0$ is a \themebf{flow model}.
 \label{summary:diffusion_model}
-\end{summarybox}
 
 在整个文档中，\themebf{扩散模型}由一个带有参数$\theta$的神经网络$u_t^\theta$（参数化向量场）和一个固定的扩散系数$\sigma_t$组成：
 \begin{align*}
@@ -376,3 +375,5 @@ A diffusion model with $\sigma_t=0$ is a \themebf{flow model}.
     \textbf{\sffamily 目标：}\quad X_1 &\sim  \pdata \quad &&\blacktriangleright\,\,\text{目标是使$X_1$具有分布$\pdata$}
 \end{align*}
 $\sigma_t=0$的扩散模型是\themebf{流模型}。
+\end{summarybox}
+
